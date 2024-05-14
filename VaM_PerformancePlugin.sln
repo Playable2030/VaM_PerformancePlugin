@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VaM_PerformancePlugin", "VaM_PerformancePlugin\VaM_PerformancePlugin.csproj", "{3EAA549F-58AD-4519-80D0-93598FA75706}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VaM_PerformancePlugin.Tests", "VaM_PerformancePlugin.Tests\VaM_PerformancePlugin.Tests.csproj", "{5347D3FD-3966-4015-B70F-CBCCD146538D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3EAA549F-58AD-4519-80D0-93598FA75706}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EAA549F-58AD-4519-80D0-93598FA75706}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EAA549F-58AD-4519-80D0-93598FA75706}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EAA549F-58AD-4519-80D0-93598FA75706}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5347D3FD-3966-4015-B70F-CBCCD146538D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5347D3FD-3966-4015-B70F-CBCCD146538D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5347D3FD-3966-4015-B70F-CBCCD146538D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5347D3FD-3966-4015-B70F-CBCCD146538D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
