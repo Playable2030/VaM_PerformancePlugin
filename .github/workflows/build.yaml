@@ -36,7 +36,10 @@ jobs:
 
 #      - name: Test
 #        run: dotnet test --no-build --verbosity normal
-
+      - name: Get short SHA
+        id: get_short_sha
+        run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
+        
       - name: Create release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -45,5 +48,5 @@ jobs:
             VaM_PerformancePlugin/bin/Release/net35/VaM_PerformancePlugin.dll
           generate_release_notes: true
           prerelease: true
-          tag_name: ${{ github.sha }}
-          name: Pre-Release - ${{ github.sha }}
+          tag_name: ${{  steps.get_short_sha.outputs.sha }}
+          name: Pre-Release - ${{ steps.get_short_sha.outputs.sha }}
