@@ -3,15 +3,98 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using HarmonyLib;
 using MVR.FileManagement;
 using MVR.FileManagementSecure;
 using UnityEngine;
 
 namespace VaM_PerformancePlugin.VaM.FileManagement;
+
+[SuppressMessage("ReSharper", "InconsistentNaming")]
+public static class FileManagerStatics
+{
+    internal static readonly Traverse fileManagerTraverse = Traverse.Create<FileManager>();
+
+    internal static readonly HashSet<VarPackage> enabledPackages = new();
+    internal static readonly HashSet<VarFileEntry> allVarFileEntries = new();
+    internal static readonly HashSet<VarDirectoryEntry> allVarDirectoryEntries = new();
+    internal static readonly Dictionary<string, VarPackage> packagesByPath = new();
+    internal static readonly Dictionary<string, VarPackage> packagesByUid = new();
+    internal static readonly Dictionary<string, VarPackageGroup> packageGroups = new();
+    internal static readonly Dictionary<string, VarFileEntry> uidToVarFileEntry = new();
+    internal static readonly Dictionary<string, VarFileEntry> pathToVarFileEntry = new();
+    internal static readonly Dictionary<string, VarDirectoryEntry> uidToVarDirectoryEntry = new();
+    internal static readonly Dictionary<string, VarDirectoryEntry> pathToVarDirectoryEntry = new();
+    internal static readonly Dictionary<string, VarDirectoryEntry> varPackagePathToRootVarDirectory = new();
+
+    // TODO why do these fail with nulls in patched methods? this is a hack that may not be good long term...
+    internal static string packageFolder =>
+        fileManagerTraverse.Property<string>("packageFolder").Value ?? "AddonPackages";
+    internal static string userPrefsFolder =>
+        fileManagerTraverse.Property<string>("userPrefsFolder").Value ?? "AddonPackagesUserPrefs";
+    internal static OnRefresh onRefreshHandlers => fileManagerTraverse.Property<OnRefresh>("onRefreshHandlers").Value;
+
+    private static readonly Traverse RegisterPackageMethod =
+        fileManagerTraverse.Method("RegisterPackage", [typeof(string)]);
+    internal static void RegisterPackage(string vpath) => RegisterPackageMethod.GetValue([vpath]);
+
+    internal static DateTime lastPackageRefreshTime
+    {
+        get => FileManager.lastPackageRefreshTime;
+        set => fileManagerTraverse.Property<DateTime>("lastPackageRefreshTime").Value = value;
+    }
+
+    internal static readonly bool packagesEnabled = new();
+    internal static readonly HashSet<string> restrictedReadPaths = new();
+    internal static readonly HashSet<string> secureReadPaths = new();
+    internal static readonly HashSet<string> secureInternalWritePaths = new();
+    internal static readonly HashSet<string> securePluginWritePaths = new();
+    internal static readonly HashSet<string> pluginWritePathsThatDoNotNeedConfirm = new();
+    internal static readonly Dictionary<string, string> pluginHashToPluginPath = new();
+    internal static readonly HashSet<string> userConfirmedPlugins = new();
+    internal static readonly HashSet<string> userDeniedPlugins = new();
+    internal static readonly LinkedList<string> loadDirStack = new();
+
+    // internal static void Init()
+    static FileManagerStatics()
+    {
+        // Link these instances in memory to the actual FileManager static fields
+        fileManagerTraverse.Property<HashSet<VarPackage>>("enabledPackages").Value = enabledPackages;
+        fileManagerTraverse.Property<HashSet<VarFileEntry>>("allVarFileEntries").Value = allVarFileEntries;
+        fileManagerTraverse.Property<HashSet<VarDirectoryEntry>>("allVarDirectoryEntries").Value =
+            allVarDirectoryEntries;
+        fileManagerTraverse.Property<Dictionary<string, VarPackage>>("packagesByPath").Value = packagesByPath;
+        fileManagerTraverse.Property<Dictionary<string, VarPackage>>("packagesByUid").Value = packagesByUid;
+        fileManagerTraverse.Property<Dictionary<string, VarPackageGroup>>("packageGroups").Value = packageGroups;
+        fileManagerTraverse.Property<Dictionary<string, VarFileEntry>>("uidToVarFileEntry").Value = uidToVarFileEntry;
+        fileManagerTraverse.Property<Dictionary<string, VarFileEntry>>("pathToVarFileEntry").Value = pathToVarFileEntry;
+        fileManagerTraverse.Property<Dictionary<string, VarDirectoryEntry>>("uidToVarDirectoryEntry").Value =
+            uidToVarDirectoryEntry;
+        fileManagerTraverse.Property<Dictionary<string, VarDirectoryEntry>>("pathToVarDirectoryEntry").Value =
+            pathToVarDirectoryEntry;
+        fileManagerTraverse.Property<Dictionary<string, VarDirectoryEntry>>("varPackagePathToRootVarDirectory").Value =
+            varPackagePathToRootVarDirectory;
+
+        // since these are initialized by default, get their references instead of giving them references
+        // packageFolder = fileManagerTraverse.Field<string>("packageFolder").Value;
+        // userPrefsFolder = fileManagerTraverse.Property<string>("userPrefsFolder").Value;
+        // onRefreshHandlers = fileManagerTraverse.Property<OnRefresh>("onRefreshHandlers").Value;
+
+        fileManagerTraverse.Property<bool>("packagesEnabled").Value = packagesEnabled;
+        fileManagerTraverse.Property<HashSet<string>>("restrictedReadPaths").Value = restrictedReadPaths;
+        fileManagerTraverse.Property<HashSet<string>>("secureReadPaths").Value = secureReadPaths;
+        fileManagerTraverse.Property<HashSet<string>>("secureInternalWritePaths").Value = secureInternalWritePaths;
+        fileManagerTraverse.Property<HashSet<string>>("securePluginWritePaths").Value = securePluginWritePaths;
+        fileManagerTraverse.Property<HashSet<string>>("pluginWritePathsThatDoNotNeedConfirm").Value =
+            pluginWritePathsThatDoNotNeedConfirm;
+        fileManagerTraverse.Property<Dictionary<string, string>>("pluginHashToPluginPath").Value =
+            pluginHashToPluginPath;
+        fileManagerTraverse.Property<HashSet<string>>("userConfirmedPlugins").Value = userConfirmedPlugins;
+        fileManagerTraverse.Property<HashSet<string>>("userDeniedPlugins").Value = userDeniedPlugins;
+        fileManagerTraverse.Property<LinkedList<string>>("loadDirStack").Value = loadDirStack;
+    }
+}
 
 /// <summary>
 /// Replaces functions on existing <see cref="FileManager"/> implementation to improve performance:
@@ -41,6 +124,13 @@ public class FileManagerPatch
     //
     // end re-implementation
 
+    // [HarmonyPatch(typeof(FileManager), MettMethodType.Constructor)]
+    // [HarmonyPostfix]
+    // private static void CTOR()
+    // {
+    //     FileManagerStatics.Init();
+    // }
+
     private const string FilePrefix = "file:///";
 
     [HarmonyPatch(typeof(FileManager), nameof(FileManager.GetFullPath))]
@@ -57,7 +147,7 @@ public class FileManagerPatch
         return false;
     }
 
-    private static readonly Regex GetSuffixRegex = new(".*/", RegexOptions.Compiled);
+    // private static readonly Regex GetSuffixRegex = new(".*/", RegexOptions.Compiled);
 
     [HarmonyPatch(typeof(FileManager),
         // nameof(FileManager.packagePathToUid)
@@ -66,34 +156,24 @@ public class FileManagerPatch
     [HarmonyPrefix]
     public static bool packagePathToUid(ref string __result, string vpath)
     {
+        VaMPerformancePlugin.PluginLogger.LogDebug($"FileManager.packagePathToUid running for <{vpath}>");
+
+        // Remove ".var" or ".zip" if it exists at the end of the string
         __result = vpath.Replace('\\', '/');
         if (__result.EndsWith(".var") || __result.EndsWith(".zip"))
         {
             // 4 = # of chars for all ext
-            __result = __result.Substring(0, __result.Length - 4);
+            __result = __result.Remove(__result.Length - 4);
         }
 
-        // find last `/` char and trim it and everything before it
-        __result = GetSuffixRegex.Replace(__result, string.Empty);
+        // Get the last part of the path by finding the last '/' and getting the substring after it
+        int lastSlashIndex = __result.LastIndexOf('/');
+        if (lastSlashIndex != -1)
+        {
+            __result = __result.Substring(lastSlashIndex + 1);
+        }
 
-        // TODO why does this not work?
-        // int charPos = -1;
-        // const char targetChar = '/';
-        // for (var i = __result.Length - 1; i >= 0; i--)
-        // {
-        //     if (targetChar == __result[i])
-        //     {
-        //         charPos = i;
-        //         break;
-        //     }
-        // }
-        //
-        // if (charPos != -1)
-        // {
-        //     // +1 to exclude `targetChar` as well
-        //     __result = __result.Substring(charPos + 1, __result.Length);
-        // }
-
+        VaMPerformancePlugin.PluginLogger.LogDebug($"Actually returning <{__result}>");
         return false;
     }
 
@@ -120,8 +200,7 @@ public class FileManagerPatch
             return false;
         }
 
-        VarFileEntry varFileEntry;
-        if (___uidToVarFileEntry.TryGetValue(key, out varFileEntry))
+        if (___uidToVarFileEntry.TryGetValue(key, out var varFileEntry))
         {
             __result = varFileEntry;
             return false;
@@ -142,64 +221,31 @@ public class FileManagerPatch
         return false;
     }
 
-    private static readonly MethodInfo RegisterPackageMethodInfo =
-        typeof(FileManager).GetMethod("RegisterPackage", BindingFlags.NonPublic)!;
 
-
-    // TODO why doesn't this patch seem to apply?
-    [HarmonyPatch(typeof(FileManager), nameof(FileManager.Refresh))]
-    [HarmonyPrefix]
-    public static bool Refresh(ref FileManager __instance,
-        ref HashSet<VarPackage> ___enabledPackages,
-        ref HashSet<VarFileEntry> ___allVarFileEntries,
-        ref HashSet<VarDirectoryEntry> ___allVarDirectoryEntries,
-        ref Dictionary<string, VarPackage> ___packagesByPath,
-        ref Dictionary<string, VarPackage> ___packagesByUid,
-        ref Dictionary<string, VarPackageGroup> ___packageGroups,
-        ref Dictionary<string, VarFileEntry> ___uidToVarFileEntry,
-        ref Dictionary<string, VarFileEntry> ___pathToVarFileEntry,
-        ref Dictionary<string, VarDirectoryEntry> ___uidToVarDirectoryEntry,
-        ref Dictionary<string, VarDirectoryEntry> ___pathToVarDirectoryEntry,
-        ref Dictionary<string, VarDirectoryEntry> ___varPackagePathToRootVarDirectory,
-        ref string ___packageFolder,
-        ref string ___userPrefsFolder,
-        ref OnRefresh ___onRefreshHandlers,
-        ref bool ___packagesEnabled,
-        ref HashSet<string> ___restrictedReadPaths,
-        ref HashSet<string> ___secureReadPaths,
-        ref HashSet<string> ___secureInternalWritePaths,
-        ref HashSet<string> ___securePluginWritePaths,
-        ref HashSet<string> ___pluginWritePathsThatDoNotNeedConfirm,
-        ref Transform ___userConfirmContainer,
-        ref Transform ___userConfirmPrefab,
-        ref Transform ___userConfirmPluginActionPref,
-        ref Dictionary<string, string> ___pluginHashToPluginPath,
-        ref AsyncFlag ___userConfirmFlag,
-        ref HashSet<UserConfirmPanel> ___activeUserConfirmPanels,
-        ref HashSet<string> ___userConfirmedPlugins,
-        ref HashSet<string> ___userDeniedPlugins,
-        ref LinkedList<string> ___loadDirStack,
-        ref DateTime ___lastPackageRefreshTime
-    )
+    // TODO why does this not work? Looks like it isn't working because of the statics not being correctly inited...
+    // [HarmonyPatch(typeof(FileManager), nameof(FileManager.Refresh))]
+    // [HarmonyPrefix]
+    public static bool Refresh()
     {
-        Debug.Log("[VaMPerformancePatch] Patched FileManager.Refresh() running...");
+        VaMPerformancePlugin.PluginLogger.LogDebug("Patched FileManager.Refresh() running...");
         if (FileManager.debug)
         {
             Debug.Log("FileManager Refresh()");
         }
+        
+        // TODO can we pull this out to avoid re-inits?
+        // FileManagerStatics.Init();
+        
+        // Pull out the static fields we need
+        var packagesByUid = FileManagerStatics.packagesByUid;
+        var packagesByPath = FileManagerStatics.packagesByPath;
+        var packageGroups = FileManagerStatics.packageGroups;
+        var enabledPackages = FileManagerStatics.enabledPackages;
 
-        // TODO move init style/ensure style code out of here and into a constructor/init
-        ___packagesByUid ??= new();
-        ___packagesByPath ??= new();
-        ___packageGroups ??= new();
-        ___enabledPackages ??= new();
-        ___allVarFileEntries ??= new();
-        ___allVarDirectoryEntries ??= new();
-        ___uidToVarFileEntry ??= new();
-        ___pathToVarFileEntry ??= new();
-        ___uidToVarDirectoryEntry ??= new();
-        ___pathToVarDirectoryEntry ??= new();
-        ___varPackagePathToRootVarDirectory ??= new();
+        var packageFolder = FileManagerStatics.packageFolder;
+        var userPrefsFolder = FileManagerStatics.userPrefsFolder;
+        var packagesEnabled = FileManagerStatics.packagesEnabled;
+        var onRefreshHandlers = FileManagerStatics.onRefreshHandlers;
 
         bool packagesChanged = false;
         float startMillis = 0.0f;
@@ -211,32 +257,32 @@ public class FileManagerPatch
 
         try
         {
-            if (!Directory.Exists(___packageFolder))
+            if (!Directory.Exists(packageFolder))
             {
-                FileManager.CreateDirectory(___packageFolder);
+                FileManager.CreateDirectory(packageFolder);
             }
 
-            if (!Directory.Exists(___userPrefsFolder))
+            if (!Directory.Exists(userPrefsFolder))
             {
-                FileManager.CreateDirectory(___userPrefsFolder);
+                FileManager.CreateDirectory(userPrefsFolder);
             }
 
-            if (Directory.Exists(___packageFolder))
+            if (Directory.Exists(packageFolder))
             {
-                IEnumerable<string> directories = null;
-                IEnumerable<string> files = null;
-                if (___packagesEnabled)
+                IEnumerable<string> directories = [];
+                IEnumerable<string> files = [];
+                if (packagesEnabled)
                 {
                     // TODO why both?
-                    directories = EnumerateDirectories(___packageFolder, "*.var", SearchOption.AllDirectories);
-                    files = EnumerateFiles(___packageFolder, "*.var", SearchOption.AllDirectories);
+                    directories = EnumerateDirectories(packageFolder, "*.var", SearchOption.AllDirectories);
+                    files = EnumerateFiles(packageFolder, "*.var", SearchOption.AllDirectories);
                 }
                 else if (FileManager.demoPackagePrefixes != null)
                 {
                     IEnumerable<string> result = new List<string>();
                     foreach (string demoPackagePrefix in FileManager.demoPackagePrefixes)
                     {
-                        IEnumerable<string> enumerateFiles = EnumerateFiles(___packageFolder,
+                        IEnumerable<string> enumerateFiles = EnumerateFiles(packageFolder,
                             demoPackagePrefix + "*.var", SearchOption.AllDirectories);
                         result = result.Concat(enumerateFiles);
                     }
@@ -251,9 +297,9 @@ public class FileManagerPatch
                 {
                     packagesToRegister.Add(directory);
                     VarPackage vp;
-                    if (___packagesByPath.TryGetValue(directory, out vp))
+                    if (packagesByPath.TryGetValue(directory, out vp))
                     {
-                        bool previouslyEnabled = ___enabledPackages.Contains(vp);
+                        bool previouslyEnabled = enabledPackages.Contains(vp);
                         bool enabled = vp.Enabled;
                         if (!previouslyEnabled && enabled || previouslyEnabled && !enabled || !vp.IsSimulated)
                         {
@@ -273,9 +319,9 @@ public class FileManagerPatch
                     {
                         packagesToRegister.Add(file);
                         VarPackage vp;
-                        if (___packagesByPath.TryGetValue(file, out vp))
+                        if (packagesByPath.TryGetValue(file, out vp))
                         {
-                            bool flag3 = ___enabledPackages.Contains(vp);
+                            bool flag3 = enabledPackages.Contains(vp);
                             bool enabled = vp.Enabled;
                             if (!flag3 && enabled || flag3 && !enabled || vp.IsSimulated)
                             {
@@ -291,7 +337,7 @@ public class FileManagerPatch
                 }
 
                 HashSet<VarPackage> varPackageSet = new();
-                foreach (VarPackage varPackage in ___packagesByUid.Values)
+                foreach (VarPackage varPackage in packagesByUid.Values)
                 {
                     if (!packagesToRegister.Contains(varPackage.Path))
                         varPackageSet.Add(varPackage);
@@ -305,18 +351,19 @@ public class FileManagerPatch
 
                 foreach (string vpath in packagesToUnregister)
                 {
-                    RegisterPackageMethodInfo.Invoke(null, [vpath]);
+                    FileManagerStatics.RegisterPackage(vpath);
+                    // FileManagerStatics.RegisterPackageMethodInfo.Invoke(null, [vpath]);
                     packagesChanged = true;
                 }
 
                 if (packagesChanged)
                 {
-                    foreach (VarPackage varPackage in ___packagesByUid.Values)
+                    foreach (VarPackage varPackage in packagesByUid.Values)
                     {
                         varPackage.LoadMetaData();
                     }
 
-                    foreach (VarPackageGroup varPackageGroup in ___packageGroups.Values)
+                    foreach (VarPackageGroup varPackageGroup in packageGroups.Values)
                     {
                         varPackageGroup.Init();
                     }
@@ -327,7 +374,7 @@ public class FileManagerPatch
                     float elapsedMilliseconds = GlobalStopwatch.GetElapsedMilliseconds();
                     float packageScanningDurationMillis = elapsedMilliseconds - startMillis;
                     Debug.Log(new StringBuilder().Append("Scanned ")
-                        .Append(___packagesByUid.Count)
+                        .Append(packagesByUid.Count)
                         .Append(" packages in ")
                         .Append(packageScanningDurationMillis.ToString("F1"))
                         .Append(" ms")
@@ -335,7 +382,7 @@ public class FileManagerPatch
                     startMillis = elapsedMilliseconds;
                 }
 
-                foreach (VarPackage varPackage in ___packagesByUid.Values)
+                foreach (VarPackage varPackage in packagesByUid.Values)
                 {
                     if (varPackage.forceRefresh)
                     {
@@ -348,7 +395,7 @@ public class FileManagerPatch
                 if (packagesChanged)
                 {
                     Debug.Log("Package changes detected");
-                    ___onRefreshHandlers?.Invoke();
+                    onRefreshHandlers?.Invoke();
                 }
                 else
                 {
@@ -381,7 +428,7 @@ public class FileManagerPatch
                 .ToString());
         }
 
-        ___lastPackageRefreshTime = DateTime.Now;
+        FileManagerStatics.lastPackageRefreshTime = DateTime.Now;
         return false;
     }
 }

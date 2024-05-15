@@ -50,8 +50,7 @@ public class ImageLoaderThreadedPatch
         {
             if (queuedImage.isThumbnail)
             {
-                Texture2D tex;
-                if (___thumbnailCache != null && ___thumbnailCache.TryGetValue(queuedImage.imgPath, out tex))
+                if (___thumbnailCache != null && ___thumbnailCache.TryGetValue(queuedImage.imgPath, out var tex))
                 {
                     if (!tex)
                     {
@@ -67,9 +66,8 @@ public class ImageLoaderThreadedPatch
             }
             else
             {
-                Texture2D texture2D;
                 if (___textureCache != null &&
-                    ___textureCache.TryGetValue(queuedImage.cacheSignature, out texture2D))
+                    ___textureCache.TryGetValue(queuedImage.cacheSignature, out var texture2D))
                 {
                     if (!texture2D)
                     {

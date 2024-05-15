@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using HarmonyLib;
 using MeshVR;
 
 namespace VaM_PerformancePlugin.VaM;
@@ -7,6 +8,8 @@ namespace VaM_PerformancePlugin.VaM;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class DAZSkinV2Patch
 {
+    [HarmonyPatch(typeof(DAZSkinV2), "FindNodeByUrl")]
+    [HarmonyPrefix]
     public static bool FindNodeByUrl(ref DAZSkinV2Node __result, string url, ref DAZSkinV2Node __instance,
         ref List<DAZSkinV2Node> ___importNodes, ref string ___skinUrl)
     {

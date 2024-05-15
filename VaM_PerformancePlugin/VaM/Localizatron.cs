@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using HarmonyLib;
 using UnityEngine;
@@ -6,6 +7,7 @@ using UnityEngine;
 namespace VaM_PerformancePlugin.VaM;
 
 // TODO this seems to only be used in the patcher
+[SuppressMessage("ReSharper", "InconsistentNaming")]
 public class LocalizatronPatch
 {
     private static bool Language_IsMatch(string language)
@@ -33,6 +35,7 @@ public class LocalizatronPatch
     }
 
     [HarmonyPatch(typeof(Localizatron), nameof(Localizatron.SetLanguage))]
+    [HarmonyPrefix]
     public static bool SetLanguage(ref Localizatron __instance, ref bool __result, string language,
         ref string ____currentLanguage,
         ref string ____languagePath, ref Dictionary<string, string> ___languageTable)
