@@ -37,7 +37,7 @@ jobs:
         with:
           files: |
             VaM_PerformancePlugin/bin/Release/net35/VaM_PerformancePlugin.dll
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.sha }}
-          release_name: Pre-Release - ${{ github.sha }}
+          generate_release_notes: true
           prerelease: true
+          tag_name: ${{ github.sha }}
+          name: Pre-Release - ${{ github.sha }}
