@@ -9,6 +9,7 @@ using UnityEngine.Networking;
 
 namespace VaM_PerformancePlugin.VaM;
 
+// Not currently used
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class ImageLoaderThreadedPatch
 {

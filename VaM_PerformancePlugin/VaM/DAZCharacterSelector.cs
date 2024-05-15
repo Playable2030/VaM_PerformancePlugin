@@ -15,6 +15,7 @@ public class DAZCharacterSelectorMeta(DAZCharacterSelector parentInstance)
   private DAZClothingItem[] _clothingItemByBackupId = [];
 }
 
+// WIP, Not currently used due to complicated rewrite needing additional fields/instance tracking
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class DAZCharacterSelectorPatch
 {
