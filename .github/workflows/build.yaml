@@ -3,7 +3,7 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout repository
@@ -13,7 +13,15 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
-
+        
+      - name: Cache .NET restore
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: "${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}"
+          restore-keys: |
+            ${{ runner.os }}-nuget
+            
       - name: Restore dependencies
         run: dotnet restore
 
@@ -28,7 +36,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            path/to/your/*.dll
+            VaM_PerformancePlugin/bin/Release/net35/VaM_PerformancePlugin.dll
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.sha }}
           release_name: Pre-Release - ${{ github.sha }}
