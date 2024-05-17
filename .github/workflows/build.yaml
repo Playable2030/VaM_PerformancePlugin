@@ -34,8 +34,26 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      - name: Install 7-Zip
+        run: choco install 7zip
+
+      - name: Download BepInEx 5.X
+        run: curl https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.1/BepInEx_win_x64_5.4.23.1.zip
+        
+      - name: Extract ZIP
+        run: 7za x BepInEx_win_x64_5.4.23.1.zip -oBepInEx_win_x64_5.4.23.1
+
+      - name: Add DLL to ZIP
+        run: |
+          mkdir BepInEx_win_x64_5.4.23.1/BepInEx/plugins/
+          copy VaM_PerformancePlugin/bin/Release/net35/VaM_PerformancePlugin.dll BepInEx_win_x64_5.4.23.1/BepInEx/plugins/
+      
+      - name: Recompress ZIP
+        run: 7za a BepInEx_win_x64_5.4.23.1_with_VaM_PerformancePlugin.zip BepInEx_win_x64_5.4.23.1\
+        
 #      - name: Test
 #        run: dotnet test --no-build --verbosity normal
+      
       - name: Get short SHA
         id: get_short_sha
         run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
@@ -45,6 +63,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            BepInEx_win_x64_5.4.23.1_with_VaM_PerformancePlugin.zip
             VaM_PerformancePlugin/bin/Release/net35/VaM_PerformancePlugin.dll
           generate_release_notes: true
           prerelease: true
