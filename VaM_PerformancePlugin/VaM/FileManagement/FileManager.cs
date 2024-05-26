@@ -884,14 +884,16 @@ public static class LazyFileManager
         return Path.GetFullPath(path);
     }
 
+    private static readonly Regex PackagePathRegex = new(":/.*"); 
+
     public static bool IsPackagePath(string path)
     {
-        return GetPackage(Regex.Replace(path.Replace('\\', '/'), ":/.*", string.Empty)) != null;
+        return GetPackage(PackagePathRegex.Replace(path.Replace('\\', '/'), string.Empty)) != null;
     }
 
     public static bool IsSimulatedPackagePath(string path)
     {
-        var package = GetPackage(Regex.Replace(path.Replace('\\', '/'), ":/.*", string.Empty));
+        var package = GetPackage(PackagePathRegex.Replace(path.Replace('\\', '/'), string.Empty));
         return package != null && package.IsSimulated;
     }
 
@@ -900,7 +902,7 @@ public static class LazyFileManager
         var input = path.Replace('\\', '/');
         if (input.Contains(":/"))
         {
-            var package = GetPackage(Regex.Replace(input, ":/.*", string.Empty));
+            var package = GetPackage(PackagePathRegex.Replace(input, string.Empty));
             if (package != null && package.IsSimulated)
             {
                 var str = Regex.Replace(input, ".*:/", string.Empty);
@@ -913,7 +915,7 @@ public static class LazyFileManager
 
     public static string RemovePackageFromPath(string path)
     {
-        return Regex.Replace(Regex.Replace(path, ".*:/", string.Empty), ".*:\\\\", string.Empty);
+        return Regex.Replace(Regex.Replace(path, ".*:/", string.Empty), @".*:\\", string.Empty);
     }
 
     public static string NormalizePath(string path)
@@ -1110,7 +1112,7 @@ public static class LazyFileManager
     {
         var input = path;
         Match match1;
-        if ((match1 = Regex.Match(input, "^(([^\\.]+\\.[^\\.]+)\\.latest):")).Success)
+        if ((match1 = Regex.Match(input, @"^(([^\.]+\.[^\.]+)\.latest):")).Success)
         {
             var oldValue = match1.Groups[1].Value;
             var packageGroup = GetPackageGroup(match1.Groups[2].Value);
@@ -1121,7 +1123,7 @@ public static class LazyFileManager
         else
         {
             Match match2;
-            if ((match2 = Regex.Match(input, "^(([^\\.]+\\.[^\\.]+)\\.min([0-9]+)):")).Success)
+            if ((match2 = Regex.Match(input, @"^(([^\.]+\.[^\.]+)\.min([0-9]+)):")).Success)
             {
                 var oldValue = match2.Groups[1].Value;
                 var packageGroupUid = match2.Groups[2].Value;
@@ -1135,7 +1137,7 @@ public static class LazyFileManager
             else
             {
                 Match match3;
-                if (!(match3 = Regex.Match(input, "^([^\\.]+\\.[^\\.]+\\.[0-9]+):")).Success) return input;
+                if (!(match3 = Regex.Match(input, @"^([^\.]+\.[^\.]+\.[0-9]+):")).Success) return input;
                 var str = match3.Groups[1].Value;
                 var package = GetPackage(str);
                 if (package is { Enabled: true }) return input;
@@ -1586,7 +1588,18 @@ public static class LazyFileManager
 
     public static string CleanDirectoryPath(string path)
     {
-        return path != null ? Regex.Replace(path.Replace('\\', '/'), "/$", string.Empty) : null;
+        if (path == null)
+        {
+            return null;
+        }
+
+        path = path.Replace('\\', '/');
+        if (path.EndsWith("/"))
+        {
+            path = path.Substring(0, path.Length - 1);
+        }
+
+        return path;
     }
 
     public static int FolderContentsCount(string path)
@@ -1625,7 +1638,7 @@ public static class LazyFileManager
         bool generateAllFlattenedShortcut = false,
         bool includeRegularDirsInFlattenedShortcut = false)
     {
-        dir = Regex.Replace(dir, ".*:\\\\", string.Empty);
+        dir = Regex.Replace(dir, @".*:\\", string.Empty);
         var str = dir.TrimEnd('/', '\\').Replace('\\', '/');
         var varDirectories = FindVarDirectories(str);
         List<ShortCut> cutsForDirectory = [];
@@ -1773,7 +1786,7 @@ public static class LazyFileManager
 
     public static DirectoryEntry GetDirectoryEntry(string path, bool restrictPath = false)
     {
-        var path1 = Regex.Replace(path, "(/|\\\\)$", string.Empty);
+        var path1 = Regex.Replace(path, @"(/|\\)$", string.Empty);
         return (DirectoryEntry)GetVarDirectoryEntry(path1) ??
                GetSystemDirectoryEntry(path1, restrictPath);
     }
