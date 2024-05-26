@@ -114,14 +114,14 @@ public static class LazyFileManager
         {
             var creator = strArray[0];
             var name = strArray[1];
-            var str = creator + "." + name;
+            var str = $"{creator}.{name}";
             var s = strArray[2];
             try
             {
                 var version = int.Parse(s);
                 if (packagesByUid.ContainsKey(uid))
                 {
-                    SuperController.LogError("Duplicate package uid " + uid + ". Cannot register");
+                    SuperController.LogError($"Duplicate package uid {uid}. Cannot register");
                 }
                 else
                 {
@@ -138,56 +138,53 @@ public static class LazyFileManager
                     packagesByPath.Add(vp.FullPath, vp);
                     packagesByPath.Add(vp.FullSlashPath, vp);
                     group.AddPackage(vp);
-                    if (vp.Enabled)
+                    if (!vp.Enabled) return vp;
+                    enabledPackages.Add(vp);
+                    foreach (var fileEntry in vp.FileEntries)
                     {
-                        enabledPackages.Add(vp);
-                        foreach (var fileEntry in vp.FileEntries)
-                        {
-                            allVarFileEntries.Add(fileEntry);
-                            uidToVarFileEntry.Add(fileEntry.Uid, fileEntry);
-                            // if (LazyFileManager.debug)
-                            // {
-                            //     Debug.Log("Add var file with UID " + fileEntry.Uid);
-                            // }
+                        allVarFileEntries.Add(fileEntry);
+                        uidToVarFileEntry.Add(fileEntry.Uid, fileEntry);
+                        // if (LazyFileManager.debug)
+                        // {
+                        //     Debug.Log("Add var file with UID " + fileEntry.Uid);
+                        // }
 
-                            pathToVarFileEntry.Add(fileEntry.Path, fileEntry);
-                            pathToVarFileEntry.Add(fileEntry.SlashPath, fileEntry);
-                            pathToVarFileEntry.Add(fileEntry.FullPath, fileEntry);
-                            pathToVarFileEntry.Add(fileEntry.FullSlashPath, fileEntry);
-                        }
-
-                        foreach (var directoryEntry in vp.DirectoryEntries)
-                        {
-                            allVarDirectoryEntries.Add(directoryEntry);
-                            // if (LazyFileManager.debug)
-                            // {
-                            //     Debug.Log("Add var directory with UID " + directoryEntry.Uid);
-                            // }
-
-                            uidToVarDirectoryEntry.Add(directoryEntry.Uid, directoryEntry);
-                            pathToVarDirectoryEntry.Add(directoryEntry.Path, directoryEntry);
-                            pathToVarDirectoryEntry.Add(directoryEntry.SlashPath, directoryEntry);
-                            pathToVarDirectoryEntry.Add(directoryEntry.FullPath, directoryEntry);
-                            pathToVarDirectoryEntry.Add(directoryEntry.FullSlashPath, directoryEntry);
-                        }
-
-                        varPackagePathToRootVarDirectory.Add(vp.Path, vp.RootDirectory);
-                        varPackagePathToRootVarDirectory.Add(vp.FullPath, vp.RootDirectory);
+                        pathToVarFileEntry.Add(fileEntry.Path, fileEntry);
+                        pathToVarFileEntry.Add(fileEntry.SlashPath, fileEntry);
+                        pathToVarFileEntry.Add(fileEntry.FullPath, fileEntry);
+                        pathToVarFileEntry.Add(fileEntry.FullSlashPath, fileEntry);
                     }
+
+                    foreach (var directoryEntry in vp.DirectoryEntries)
+                    {
+                        allVarDirectoryEntries.Add(directoryEntry);
+                        // if (LazyFileManager.debug)
+                        // {
+                        //     Debug.Log("Add var directory with UID " + directoryEntry.Uid);
+                        // }
+
+                        uidToVarDirectoryEntry.Add(directoryEntry.Uid, directoryEntry);
+                        pathToVarDirectoryEntry.Add(directoryEntry.Path, directoryEntry);
+                        pathToVarDirectoryEntry.Add(directoryEntry.SlashPath, directoryEntry);
+                        pathToVarDirectoryEntry.Add(directoryEntry.FullPath, directoryEntry);
+                        pathToVarDirectoryEntry.Add(directoryEntry.FullSlashPath, directoryEntry);
+                    }
+
+                    varPackagePathToRootVarDirectory.Add(vp.Path, vp.RootDirectory);
+                    varPackagePathToRootVarDirectory.Add(vp.FullPath, vp.RootDirectory);
 
                     return vp;
                 }
             }
             catch (FormatException)
             {
-                SuperController.LogError("VAR file " + vpath +
-                                         " does not use integer version field in name <creator>.<name>.<version>");
+                SuperController.LogError(
+                    $"VAR file {vpath} does not use integer version field in name <creator>.<name>.<version>");
             }
         }
         else
         {
-            SuperController.LogError("VAR file " + vpath +
-                                     " is not named with convention <creator>.<name>.<version>");
+            SuperController.LogError($"VAR file {vpath} is not named with convention <creator>.<name>.<version>");
         }
 
         return null;
@@ -313,7 +310,7 @@ public static class LazyFileManager
                     foreach (var demoPackagePrefix in demoPackagePrefixes)
                     {
                         foreach (var file in Directory.GetFiles(packageFolder,
-                                     demoPackagePrefix + "*.var", SearchOption.AllDirectories))
+                                     $"{demoPackagePrefix}*.var", SearchOption.AllDirectories))
                         {
                             result.Add(file);
                         }
@@ -325,12 +322,12 @@ public static class LazyFileManager
                     files = result.ToArray();
                 }
 
-                HashSet<string> registeredPacakges = [];
+                HashSet<string> registeredPackages = [];
                 HashSet<string> unregisteredPackages = [];
 
                 foreach (var directory in directories)
                 {
-                    registeredPacakges.Add(directory);
+                    registeredPackages.Add(directory);
                     if (packagesByPath.TryGetValue(directory, out var vp))
                     {
                         var previouslyEnabled = enabledPackages.Contains(vp);
@@ -350,7 +347,7 @@ public static class LazyFileManager
                 {
                     foreach (var file in files)
                     {
-                        registeredPacakges.Add(file);
+                        registeredPackages.Add(file);
                         if (packagesByPath.TryGetValue(file, out var vp))
                         {
                             var inEnabledPackages = enabledPackages.Contains(vp);
@@ -370,7 +367,7 @@ public static class LazyFileManager
                 HashSet<VarPackage> packagesToRemove = [];
                 foreach (var varPackage in packagesByUid.Values)
                 {
-                    if (!registeredPacakges.Contains(varPackage.Path))
+                    if (!registeredPackages.Contains(varPackage.Path))
                     {
                         packagesToRemove.Add(varPackage);
                     }
@@ -419,7 +416,7 @@ public static class LazyFileManager
                 foreach (var varPackage in packagesByUid.Values)
                 {
                     if (!varPackage.forceRefresh) continue;
-                    Debug.Log("Force refresh of package " + varPackage.Uid);
+                    Debug.Log($"Force refresh of package {varPackage.Uid}");
                     packagesChanged = true;
                     varPackage.forceRefresh = false;
                 }
@@ -488,11 +485,9 @@ public static class LazyFileManager
         var flag1 = false;
         foreach (var restrictedReadPath in restrictedReadPaths)
         {
-            if (fullPath.StartsWith(restrictedReadPath))
-            {
-                flag1 = true;
-                break;
-            }
+            if (!fullPath.StartsWith(restrictedReadPath)) continue;
+            flag1 = true;
+            break;
         }
 
         var flag2 = false;
@@ -534,11 +529,9 @@ public static class LazyFileManager
         var flag = false;
         foreach (var internalWritePath in secureInternalWritePaths)
         {
-            if (fullPath.StartsWith(internalWritePath))
-            {
-                flag = true;
-                break;
-            }
+            if (!fullPath.StartsWith(internalWritePath)) continue;
+            flag = true;
+            break;
         }
 
         return flag;
@@ -585,11 +578,9 @@ public static class LazyFileManager
         for (var index = 0; index < stackTrace.FrameCount; ++index)
         {
             var name = stackTrace.GetFrame(index).GetMethod().DeclaringType.Assembly.GetName().Name;
-            if (name.StartsWith("MVRPlugin_"))
-            {
-                pluginHash = Regex.Replace(name, "_[0-9]+$", string.Empty);
-                break;
-            }
+            if (!name.StartsWith("MVRPlugin_")) continue;
+            pluginHash = Regex.Replace(name, "_[0-9]+$", string.Empty);
+            break;
         }
 
         return pluginHash;
@@ -599,7 +590,7 @@ public static class LazyFileManager
     {
         var pluginHash = GetPluginHash();
         if (pluginHash != null)
-            throw new Exception("Plugin with signature " + pluginHash + " tried to execute forbidden operation");
+            throw new Exception($"Plugin with signature {pluginHash} tried to execute forbidden operation");
     }
 
     public static void DestroyUserConfirmPanel(UserConfirmPanel ucp)
@@ -638,16 +629,15 @@ public static class LazyFileManager
         UserActionCallback autoDenyCallback,
         UserActionCallback denyStickyCallback)
     {
-        if (userConfirmContainer != null &&
-            userConfirmPrefab != null)
+        if (userConfirmContainer &&
+            userConfirmPrefab)
         {
-            if (activeUserConfirmPanels == null)
-                activeUserConfirmPanels = [];
+            activeUserConfirmPanels ??= [];
             CreateUserConfirmFlag();
             var transform = Object.Instantiate(userConfirmPrefab, userConfirmContainer, false);
             transform.SetAsFirstSibling();
             var ucp = transform.GetComponent<UserConfirmPanel>();
-            if (ucp != null)
+            if (ucp)
             {
                 ucp.signature = prompt;
                 ucp.SetPrompt(prompt);
@@ -827,7 +817,7 @@ public static class LazyFileManager
                     !pluginHashToPluginPath.TryGetValue(pluginHash, out var str))
                     str = pluginHash;
                 ucp.signature = pluginHash;
-                ucp.SetPrompt("Plugin " + str + "\nwants to " + prompt);
+                ucp.SetPrompt($"Plugin {str}\nwants to {prompt}");
                 activeUserConfirmPanels.Add(ucp);
                 ucp.SetConfirmCallback(() =>
                 {
@@ -884,38 +874,35 @@ public static class LazyFileManager
         return Path.GetFullPath(path);
     }
 
-    private static readonly Regex PackagePathRegex = new(":/.*"); 
+    private static readonly Regex PackageUrlPrefixRegex = new(".*:/");
+    private static readonly Regex PackageUrlSuffixRegex = new(":/.*");
 
     public static bool IsPackagePath(string path)
     {
-        return GetPackage(PackagePathRegex.Replace(path.Replace('\\', '/'), string.Empty)) != null;
+        return GetPackage(PackageUrlSuffixRegex.Replace(path.Replace('\\', '/'), string.Empty)) != null;
     }
 
     public static bool IsSimulatedPackagePath(string path)
     {
-        var package = GetPackage(PackagePathRegex.Replace(path.Replace('\\', '/'), string.Empty));
-        return package != null && package.IsSimulated;
+        var package = GetPackage(PackageUrlSuffixRegex.Replace(path.Replace('\\', '/'), string.Empty));
+        return package is { IsSimulated: true };
     }
 
     public static string ConvertSimulatedPackagePathToNormalPath(string path)
     {
         var input = path.Replace('\\', '/');
-        if (input.Contains(":/"))
-        {
-            var package = GetPackage(PackagePathRegex.Replace(input, string.Empty));
-            if (package != null && package.IsSimulated)
-            {
-                var str = Regex.Replace(input, ".*:/", string.Empty);
-                path = package.SlashPath + "/" + str;
-            }
-        }
+        if (!input.Contains(":/")) return path;
+        var package = GetPackage(PackageUrlSuffixRegex.Replace(input, string.Empty));
+        if (package is not { IsSimulated: true }) return path;
+        var str = PackageUrlPrefixRegex.Replace(input, string.Empty);
+        path = $"{package.SlashPath}/{str}";
 
         return path;
     }
 
     public static string RemovePackageFromPath(string path)
     {
-        return Regex.Replace(Regex.Replace(path, ".*:/", string.Empty), @".*:\\", string.Empty);
+        return Regex.Replace(PackageUrlPrefixRegex.Replace(path, string.Empty), @".*:\\", string.Empty);
     }
 
     public static string NormalizePath(string path)
@@ -926,7 +913,7 @@ public static class LazyFileManager
         if (varFileEntry == null)
         {
             var fullPath = GetFullPath(path);
-            var oldValue = Path.GetFullPath(".") + "\\";
+            var oldValue = $"{Path.GetFullPath(".")}\\";
             var str3 = fullPath.Replace(oldValue, string.Empty);
             if (str3 != fullPath)
                 str1 = str3;
@@ -961,74 +948,46 @@ public static class LazyFileManager
             if (!allowPackagePath)
                 return null;
             var str1 = varDirectoryEntry.InternalSlashPath.Replace(oldValue, string.Empty);
-            if (varDirectoryEntry.InternalSlashPath != str1)
-            {
-                var str2 = str1.Replace('/', '\\');
-                return varDirectoryEntry.Package.SlashPath + ":/" + oldValue + str2;
-            }
-        }
-        else
-        {
-            var str3 = path.Replace(oldValue, string.Empty);
-            if (path != str3)
-            {
-                var str4 = str3.Replace('/', '\\');
-                return suggestedDir + str4;
-            }
+            if (varDirectoryEntry.InternalSlashPath == str1) return null;
+            var str2 = str1.Replace('/', '\\');
+            return $"{varDirectoryEntry.Package.SlashPath}:/{oldValue}{str2}";
         }
 
-        return null;
+        var str3 = path.Replace(oldValue, string.Empty);
+        if (path == str3) return null;
+        var str4 = str3.Replace('/', '\\');
+        return suggestedDir + str4;
     }
 
-    public static string CurrentLoadDir
-    {
-        get
-        {
-            return loadDirStack != null && loadDirStack.Count > 0
-                ? loadDirStack.Last.Value
-                : null;
-        }
-    }
+    public static string CurrentLoadDir =>
+        loadDirStack is { Count: > 0 }
+            ? loadDirStack.Last.Value
+            : null;
 
     public static string CurrentPackageUid
     {
         get
         {
             var currentLoadDir = CurrentLoadDir;
-            if (currentLoadDir != null)
-            {
-                var varDirectoryEntry = GetVarDirectoryEntry(currentLoadDir);
-                if (varDirectoryEntry != null)
-                    return varDirectoryEntry.Package.Uid;
-            }
-
-            return null;
+            if (currentLoadDir == null) return null;
+            var varDirectoryEntry = GetVarDirectoryEntry(currentLoadDir);
+            return varDirectoryEntry?.Package.Uid;
         }
     }
 
-    public static string TopLoadDir
-    {
-        get
-        {
-            return loadDirStack != null && loadDirStack.Count > 0
-                ? loadDirStack.First.Value
-                : null;
-        }
-    }
+    public static string TopLoadDir =>
+        loadDirStack is { Count: > 0 }
+            ? loadDirStack.First.Value
+            : null;
 
     public static string TopPackageUid
     {
         get
         {
             var topLoadDir = TopLoadDir;
-            if (topLoadDir != null)
-            {
-                var varDirectoryEntry = GetVarDirectoryEntry(topLoadDir);
-                if (varDirectoryEntry != null)
-                    return varDirectoryEntry.Package.Uid;
-            }
-
-            return null;
+            if (topLoadDir == null) return null;
+            var varDirectoryEntry = GetVarDirectoryEntry(topLoadDir);
+            return varDirectoryEntry?.Package.Uid;
         }
     }
 
@@ -1041,10 +1000,16 @@ public static class LazyFileManager
     public static void PushLoadDir(string dir, bool restrictPath = false)
     {
         var str = dir.Replace('\\', '/');
-        if (str != "/")
-            str = Regex.Replace(str, "/$", string.Empty);
+        if (str != "/" && str.EndsWith("/"))
+        {
+            str = str.Substring(0, str.Length - 1);
+        }
+
         if (restrictPath && !IsSecureReadPath(str))
-            throw new Exception("Attempted to push load dir for non-secure dir " + str);
+        {
+            throw new Exception($"Attempted to push load dir for non-secure dir {str}");
+        }
+
         loadDirStack ??= [];
         loadDirStack.AddLast(str);
     }
@@ -1068,13 +1033,13 @@ public static class LazyFileManager
     {
         var fileEntry = !restrictPath || IsSecureReadPath(path)
             ? GetFileEntry(path)
-            : throw new Exception("Attempted to set load dir from non-secure path " + path);
+            : throw new Exception($"Attempted to set load dir from non-secure path {path}");
         PushLoadDir(
             fileEntry == null
                 ? Path.GetDirectoryName(GetFullPath(path))
-                    .Replace(Path.GetFullPath(".") + "\\", string.Empty)
+                    .Replace($"{Path.GetFullPath(".")}\\", string.Empty)
                 : (!(fileEntry is VarFileEntry)
-                    ? Path.GetDirectoryName(fileEntry.FullPath).Replace(Path.GetFullPath(".") + "\\", string.Empty)
+                    ? Path.GetDirectoryName(fileEntry.FullPath).Replace($"{Path.GetFullPath(".")}\\", string.Empty)
                     : Path.GetDirectoryName(fileEntry.Uid)), restrictPath);
     }
 
@@ -1093,17 +1058,16 @@ public static class LazyFileManager
 
     public static string NormalizeID(string id)
     {
-        var path = id;
         string str;
-        if (path.StartsWith("SELF:"))
+        if (id.StartsWith("SELF:"))
         {
             var currentPackageUid = CurrentPackageUid;
             str = currentPackageUid == null
-                ? path.Replace("SELF:", string.Empty)
-                : path.Replace("SELF:", currentPackageUid + ":");
+                ? id.Replace("SELF:", string.Empty)
+                : id.Replace("SELF:", $"{currentPackageUid}:");
         }
         else
-            str = NormalizeCommon(path);
+            str = NormalizeCommon(id);
 
         return str;
     }
@@ -1161,9 +1125,9 @@ public static class LazyFileManager
         if (!string.IsNullOrEmpty(currentLoadDir))
         {
             if (!str2.Contains("/"))
-                str2 = currentLoadDir + "/" + str2;
+                str2 = $"{currentLoadDir}/{str2}";
             else if (Regex.IsMatch(str2, "^\\./"))
-                str2 = Regex.Replace(str2, "^\\./", currentLoadDir + "/");
+                str2 = Regex.Replace(str2, "^\\./", $"{currentLoadDir}/");
         }
 
         if (str2.StartsWith("SELF:/"))
@@ -1171,7 +1135,7 @@ public static class LazyFileManager
             var currentPackageUid = CurrentPackageUid;
             str1 = currentPackageUid == null
                 ? str2.Replace("SELF:/", string.Empty)
-                : str2.Replace("SELF:/", currentPackageUid + ":/");
+                : str2.Replace("SELF:/", $"{currentPackageUid}:/");
         }
         else
             str1 = NormalizeCommon(str2);
@@ -1193,9 +1157,9 @@ public static class LazyFileManager
             if (IsPackagePath(path))
                 return;
             CurrentSaveDir = !restrictPath || IsSecureWritePath(path)
-                ? GetFullPath(path).Replace(Path.GetFullPath(".") + "\\", string.Empty)
+                ? GetFullPath(path).Replace($"{Path.GetFullPath(".")}\\", string.Empty)
                     .Replace('\\', '/')
-                : throw new Exception("Attempted to set save dir from non-secure path " + path);
+                : throw new Exception($"Attempted to set save dir from non-secure path {path}");
         }
     }
 
@@ -1205,9 +1169,9 @@ public static class LazyFileManager
         if (IsPackagePath(path))
             return;
         CurrentSaveDir = !restrictPath || IsSecureWritePath(path)
-            ? Path.GetDirectoryName(GetFullPath(path)).Replace(Path.GetFullPath(".") + "\\", string.Empty)
+            ? Path.GetDirectoryName(GetFullPath(path)).Replace($"{Path.GetFullPath(".")}\\", string.Empty)
                 .Replace('\\', '/')
-            : throw new Exception("Attempted to set save dir from non-secure path " + path);
+            : throw new Exception($"Attempted to set save dir from non-secure path {path}");
     }
 
     public static void SetNullSaveDir() => CurrentSaveDir = null;
@@ -1218,7 +1182,7 @@ public static class LazyFileManager
         if (string.IsNullOrEmpty(path) || path == "/" || path == "NULL") return str;
 
         var fullPath = GetFullPath(path);
-        var oldValue = Path.GetFullPath(".") + "\\";
+        var oldValue = $"{Path.GetFullPath(".")}\\";
         var path1 = fullPath.Replace(oldValue, string.Empty);
         if (path1 != fullPath)
             str = path1;
@@ -1231,9 +1195,9 @@ public static class LazyFileManager
             str = fileName;
         }
         else if (input != null && CurrentSaveDir != null && CurrentSaveDir != string.Empty &&
-                 Regex.IsMatch(input, "^" + CurrentSaveDir + "/"))
+                 Regex.IsMatch(input, $"^{CurrentSaveDir}/"))
         {
-            str = input.Replace(CurrentSaveDir, ".") + "/" + fileName;
+            str = $"{input.Replace(CurrentSaveDir, ".")}/{fileName}";
         }
 
         return str;
@@ -1316,8 +1280,7 @@ public static class LazyFileManager
                 if (package == vp || !package.PluginsAlwaysEnabled) continue;
                 vp.PluginsAlwaysEnabled = true;
                 SuperController.AlertUser(
-                    vp.Uid + "\nuploaded by Hub user: " + packageUid.publisher +
-                    "\n\nwas just downloaded and contains plugins. This package has been automatically set to always enable plugins due to previous version of this same package having that preference set.\n\nClick OK if you accept.\n\nClick Cancel if you wish to reject this automatic setting.",
+                    $"{vp.Uid}\nuploaded by Hub user: {packageUid.publisher}\n\nwas just downloaded and contains plugins. This package has been automatically set to always enable plugins due to previous version of this same package having that preference set.\n\nClick OK if you accept.\n\nClick Cancel if you wish to reject this automatic setting.",
                     null, () => vp.PluginsAlwaysEnabled = false);
                 break;
             }
@@ -1325,8 +1288,7 @@ public static class LazyFileManager
             if (!UserPreferences.singleton.alwaysAllowPluginsDownloadedFromHub || vp.PluginsAlwaysEnabled) continue;
             vp.PluginsAlwaysEnabled = true;
             SuperController.AlertUser(
-                vp.Uid + "\nuploaded by Hub user: " + packageUid.publisher +
-                "\n\nwas just downloaded and contains plugins. This package has been automatically set to always enable plugins due to your user preference setting.\n\nClick OK if you accept.\n\nClick Cancel if you wish to reject this automatic setting for this package.",
+                $"{vp.Uid}\nuploaded by Hub user: {packageUid.publisher}\n\nwas just downloaded and contains plugins. This package has been automatically set to always enable plugins due to your user preference setting.\n\nClick OK if you accept.\n\nClick Cancel if you wish to reject this automatic setting for this package.",
                 null, () => vp.PluginsAlwaysEnabled = false);
         }
 
@@ -1364,8 +1326,8 @@ public static class LazyFileManager
         if (!Directory.Exists(dir))
             return;
         if (restrictPath && !IsSecureReadPath(dir))
-            throw new Exception("Attempted to find files for non-secure path " + dir);
-        var regex = "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+            throw new Exception($"Attempted to find files for non-secure path {dir}");
+        var regex = $"^{Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".")}$";
         FindRegularFilesRegex(dir, regex, foundFiles, restrictPath);
     }
 
@@ -1397,7 +1359,7 @@ public static class LazyFileManager
         if (!Directory.Exists(dir))
             return;
         if (restrictPath && !IsSecureReadPath(dir))
-            throw new Exception("Attempted to find files for non-secure path " + dir);
+            throw new Exception($"Attempted to find files for non-secure path {dir}");
         foreach (var file in Directory.GetFiles(dir))
         {
             if (!Regex.IsMatch(file, regex, RegexOptions.IgnoreCase)) continue;
@@ -1405,7 +1367,7 @@ public static class LazyFileManager
             if (systemFileEntry.Exists)
                 foundFiles.Add(systemFileEntry);
             else
-                Debug.LogError("Error in lookup SystemFileEntry for " + file);
+                Debug.LogError($"Error in lookup SystemFileEntry for {file}");
         }
 
         foreach (var directory in Directory.GetDirectories(dir))
@@ -1416,7 +1378,7 @@ public static class LazyFileManager
     {
         if (allVarFileEntries == null)
             return;
-        var regex = "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+        var regex = $"^{Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".")}$";
         FindVarFilesRegex(dir, regex, foundFiles);
     }
 
@@ -1446,9 +1408,8 @@ public static class LazyFileManager
 
         if (!File.Exists(path)) return false;
         if (restrictPath && !IsSecureReadPath(path))
-            throw new Exception("Attempted to check file existence for non-secure path " + path);
+            throw new Exception($"Attempted to check file existence for non-secure path {path}");
         return true;
-
     }
 
     public static DateTime FileLastWriteTime(string path, bool onlySystemFiles = false, bool restrictPath = false)
@@ -1468,7 +1429,7 @@ public static class LazyFileManager
         if (File.Exists(path))
             return !restrictPath || IsSecureReadPath(path)
                 ? new FileInfo(path).LastWriteTime
-                : throw new Exception("Attempted to check file existence for non-secure path " + path);
+                : throw new Exception($"Attempted to check file existence for non-secure path {path}");
 
         return DateTime.MinValue;
     }
@@ -1490,7 +1451,7 @@ public static class LazyFileManager
         if (File.Exists(path))
             return !restrictPath || IsSecureReadPath(path)
                 ? new FileInfo(path).CreationTime
-                : throw new Exception("Attempted to check file existence for non-secure path " + path);
+                : throw new Exception($"Attempted to check file existence for non-secure path {path}");
 
         return DateTime.MinValue;
     }
@@ -1540,7 +1501,7 @@ public static class LazyFileManager
         if (File.Exists(path))
             systemFileEntry = !restrictPath || IsSecureReadPath(path)
                 ? new SystemFileEntry(path)
-                : throw new Exception("Attempted to get file entry for non-secure path " + path);
+                : throw new Exception($"Attempted to get file entry for non-secure path {path}");
         return systemFileEntry;
     }
 
@@ -1644,8 +1605,10 @@ public static class LazyFileManager
         List<ShortCut> cutsForDirectory = [];
         if (DirectoryExists(str))
         {
-            var shortCut = new ShortCut();
-            shortCut.package = string.Empty;
+            var shortCut = new ShortCut
+            {
+                package = string.Empty
+            };
             if (allowNavigationAboveRegularDirectories)
             {
                 str = str.Replace('/', '\\');
@@ -1666,7 +1629,7 @@ public static class LazyFileManager
                     cutsForDirectory.Add(new ShortCut
                     {
                         path = str,
-                        displayName = "From: " + str,
+                        displayName = $"From: {str}",
                         flatten = true,
                         package = "All Flattened",
                         includeRegularDirsInFlatten = true
@@ -1674,7 +1637,7 @@ public static class LazyFileManager
                 cutsForDirectory.Add(new ShortCut
                 {
                     path = str,
-                    displayName = "From: " + str,
+                    displayName = $"From: {str}",
                     flatten = true,
                     package = "AddonPackages Flattened"
                 });
@@ -1684,7 +1647,7 @@ public static class LazyFileManager
             {
                 package = "AddonPackages Filtered",
                 path = "AddonPackages",
-                displayName = "Filter: " + str,
+                displayName = $"Filter: {str}",
                 packageFilter = str
             });
         }
@@ -1715,14 +1678,10 @@ public static class LazyFileManager
                 return true;
         }
 
-        if (Directory.Exists(path))
-        {
-            if (restrictPath && !IsSecureReadPath(path))
-                throw new Exception("Attempted to check file existence for non-secure path " + path);
-            return true;
-        }
-
-        return false;
+        if (!Directory.Exists(path)) return false;
+        if (restrictPath && !IsSecureReadPath(path))
+            throw new Exception($"Attempted to check file existence for non-secure path {path}");
+        return true;
     }
 
     public static DateTime DirectoryLastWriteTime(
@@ -1745,7 +1704,7 @@ public static class LazyFileManager
         if (Directory.Exists(path))
             return !restrictPath || IsSecureReadPath(path)
                 ? new DirectoryInfo(path).LastWriteTime
-                : throw new Exception("Attempted to check directory last write time for non-secure path " + path);
+                : throw new Exception($"Attempted to check directory last write time for non-secure path {path}");
 
         return DateTime.MinValue;
     }
@@ -1770,7 +1729,7 @@ public static class LazyFileManager
         if (Directory.Exists(path))
             return !restrictPath || IsSecureReadPath(path)
                 ? new DirectoryInfo(path).CreationTime
-                : throw new Exception("Attempted to check directory creation time for non-secure path " + path);
+                : throw new Exception($"Attempted to check directory creation time for non-secure path {path}");
 
         return DateTime.MinValue;
     }
@@ -1797,7 +1756,7 @@ public static class LazyFileManager
         if (Directory.Exists(path))
             systemDirectoryEntry = !restrictPath || IsSecureReadPath(path)
                 ? new SystemDirectoryEntry(path)
-                : throw new Exception("Attempted to get directory entry for non-secure path " + path);
+                : throw new Exception($"Attempted to get directory entry for non-secure path {path}");
         return systemDirectoryEntry;
     }
 
@@ -1823,18 +1782,18 @@ public static class LazyFileManager
     public static string[] GetDirectories(string dir, string pattern = null, bool restrictPath = false)
     {
         if (restrictPath && !IsSecureReadPath(dir))
-            throw new Exception("Attempted to get directories at non-secure path " + dir);
+            throw new Exception($"Attempted to get directories at non-secure path {dir}");
         List<string> stringList = [];
         var directoryEntry = GetDirectoryEntry(dir, restrictPath);
         if (directoryEntry == null)
-            throw new Exception("Attempted to get directories at non-existent path " + dir);
+            throw new Exception($"Attempted to get directories at non-existent path {dir}");
         string pattern1 = null;
         if (pattern != null)
-            pattern1 = "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+            pattern1 = $"^{Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".")}$";
         foreach (var subDirectory in directoryEntry.SubDirectories)
         {
             if (pattern1 == null || Regex.IsMatch(subDirectory.Name, pattern1))
-                stringList.Add(dir + "\\" + subDirectory.Name);
+                stringList.Add($"{dir}\\{subDirectory.Name}");
         }
 
         return stringList.ToArray();
@@ -1843,13 +1802,13 @@ public static class LazyFileManager
     public static string[] GetFiles(string dir, string pattern = null, bool restrictPath = false)
     {
         if (restrictPath && !IsSecureReadPath(dir))
-            throw new Exception("Attempted to get files at non-secure path " + dir);
+            throw new Exception($"Attempted to get files at non-secure path {dir}");
         List<string> stringList = [];
         var directoryEntry = GetDirectoryEntry(dir, restrictPath);
         if (directoryEntry == null)
-            throw new Exception("Attempted to get files at non-existent path " + dir);
+            throw new Exception($"Attempted to get files at non-existent path {dir}");
         foreach (var file in directoryEntry.GetFiles(pattern))
-            stringList.Add(dir + "\\" + file.Name);
+            stringList.Add($"{dir}\\{file.Name}");
         return stringList.ToArray();
     }
 
@@ -1859,7 +1818,7 @@ public static class LazyFileManager
         if (DirectoryExists(path))
             return;
         if (!IsSecureWritePath(path))
-            throw new Exception("Attempted to create directory at non-secure path " + path);
+            throw new Exception($"Attempted to create directory at non-secure path {path}");
         Directory.CreateDirectory(path);
     }
 
@@ -1874,7 +1833,7 @@ public static class LazyFileManager
             return;
         if (!IsSecurePluginWritePath(path))
         {
-            var e = new Exception("Plugin attempted to create directory at non-secure path " + path);
+            var e = new Exception($"Plugin attempted to create directory at non-secure path {path}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -1905,7 +1864,7 @@ public static class LazyFileManager
         if (!DirectoryExists(path))
             return;
         if (!IsSecureWritePath(path))
-            throw new Exception("Attempted to delete file at non-secure path " + path);
+            throw new Exception($"Attempted to delete file at non-secure path {path}");
         Directory.Delete(path, recursive);
     }
 
@@ -1921,7 +1880,7 @@ public static class LazyFileManager
             return;
         if (!IsSecurePluginWritePath(path))
         {
-            var e = new Exception("Plugin attempted to delete directory at non-secure path " + path);
+            var e = new Exception($"Plugin attempted to delete directory at non-secure path {path}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -1945,7 +1904,7 @@ public static class LazyFileManager
             confirmCallback();
         }
         else
-            ConfirmPluginActionWithUser("delete directory at " + path, () =>
+            ConfirmPluginActionWithUser($"delete directory at {path}", () =>
             {
                 try
                 {
@@ -1967,10 +1926,10 @@ public static class LazyFileManager
     {
         oldPath = ConvertSimulatedPackagePathToNormalPath(oldPath);
         if (!IsSecureWritePath(oldPath))
-            throw new Exception("Attempted to move directory from non-secure path " + oldPath);
+            throw new Exception($"Attempted to move directory from non-secure path {oldPath}");
         newPath = ConvertSimulatedPackagePathToNormalPath(newPath);
         if (!IsSecureWritePath(newPath))
-            throw new Exception("Attempted to move directory to non-secure path " + newPath);
+            throw new Exception($"Attempted to move directory to non-secure path {newPath}");
         Directory.Move(oldPath, newPath);
     }
 
@@ -1984,7 +1943,7 @@ public static class LazyFileManager
         oldPath = ConvertSimulatedPackagePathToNormalPath(oldPath);
         if (!IsSecurePluginWritePath(oldPath))
         {
-            var e = new Exception("Plugin attempted to move directory from non-secure path " + oldPath);
+            var e = new Exception($"Plugin attempted to move directory from non-secure path {oldPath}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -1994,7 +1953,7 @@ public static class LazyFileManager
             newPath = ConvertSimulatedPackagePathToNormalPath(newPath);
             if (!IsSecurePluginWritePath(newPath))
             {
-                var e = new Exception("Plugin attempted to move directory to non-secure path " + newPath);
+                var e = new Exception($"Plugin attempted to move directory to non-secure path {newPath}");
                 if (exceptionCallback == null)
                     throw e;
                 exceptionCallback(e);
@@ -2022,7 +1981,7 @@ public static class LazyFileManager
                     }
                 }
 
-                ConfirmPluginActionWithUser("move directory from " + oldPath + " to " + newPath,
+                ConfirmPluginActionWithUser($"move directory from {oldPath} to {newPath}",
                     () =>
                     {
                         try
@@ -2045,50 +2004,42 @@ public static class LazyFileManager
 
     public static FileEntryStream OpenStream(FileEntry fe)
     {
-        switch (fe)
+        return fe switch
         {
-            case null:
-                throw new Exception("Null FileEntry passed to OpenStreamReader");
-            case VarFileEntry _:
-                return new VarFileEntryStream(fe as VarFileEntry);
-            case SystemFileEntry _:
-                return new SystemFileEntryStream(fe as SystemFileEntry);
-            default:
-                throw new Exception("Unknown FileEntry class passed to OpenStreamReader");
-        }
+            null => throw new Exception("Null FileEntry passed to OpenStreamReader"),
+            VarFileEntry entry => new VarFileEntryStream(entry),
+            SystemFileEntry entry => new SystemFileEntryStream(entry),
+            _ => throw new Exception("Unknown FileEntry class passed to OpenStreamReader")
+        };
     }
 
     public static FileEntryStream OpenStream(string path, bool restrictPath = false)
     {
         return OpenStream(GetFileEntry(path, restrictPath) ??
-                          throw new Exception("Path " + path + " not found"));
+                          throw new Exception($"Path {path} not found"));
     }
 
     public static FileEntryStreamReader OpenStreamReader(FileEntry fe)
     {
-        switch (fe)
+        return fe switch
         {
-            case null:
-                throw new Exception("Null FileEntry passed to OpenStreamReader");
-            case VarFileEntry _:
-                return new VarFileEntryStreamReader(fe as VarFileEntry);
-            case SystemFileEntry _:
-                return new SystemFileEntryStreamReader(fe as SystemFileEntry);
-            default:
-                throw new Exception("Unknown FileEntry class passed to OpenStreamReader");
-        }
+            null => throw new Exception("Null FileEntry passed to OpenStreamReader"),
+            VarFileEntry entry => new VarFileEntryStreamReader(entry),
+            SystemFileEntry entry => new SystemFileEntryStreamReader(entry),
+            _ => throw new Exception("Unknown FileEntry class passed to OpenStreamReader")
+        };
     }
 
     public static FileEntryStreamReader OpenStreamReader(string path, bool restrictPath = false)
     {
         return OpenStreamReader(GetFileEntry(path, restrictPath) ??
-                                throw new Exception("Path " + path + " not found"));
+                                throw new Exception($"Path {path} not found"));
     }
 
     public static byte[] ReadAllBytes(string path, bool restrictPath = false)
     {
         return ReadAllBytes(GetFileEntry(path, restrictPath) ??
-                            throw new Exception("Path " + path + " not found"));
+                            throw new Exception($"Path {path} not found"));
     }
 
     public static byte[] ReadAllBytes(FileEntry fe)
@@ -2096,25 +2047,23 @@ public static class LazyFileManager
         if (!(fe is VarFileEntry))
             return File.ReadAllBytes(fe.FullPath);
         var numArray = new byte[32768];
-        using (var fileEntryStream = OpenStream(fe))
-        {
-            var buffer = new byte[fe.Size];
-            using (var memoryStream = new MemoryStream(buffer))
-                StreamUtils.Copy(fileEntryStream.Stream, memoryStream, numArray);
-            return buffer;
-        }
+        using var fileEntryStream = OpenStream(fe);
+        var buffer = new byte[fe.Size];
+        using var memoryStream = new MemoryStream(buffer);
+        StreamUtils.Copy(fileEntryStream.Stream, memoryStream, numArray);
+        return buffer;
     }
 
     public static string ReadAllText(string path, bool restrictPath = false)
     {
         return ReadAllText(GetFileEntry(path, restrictPath) ??
-                           throw new Exception("Path " + path + " not found"));
+                           throw new Exception($"Path {path} not found"));
     }
 
     public static string ReadAllText(FileEntry fe)
     {
-        using (var entryStreamReader = OpenStreamReader(fe))
-            return entryStreamReader.ReadToEnd();
+        using var entryStreamReader = OpenStreamReader(fe);
+        return entryStreamReader.ReadToEnd();
     }
 
     public static FileStream OpenStreamForCreate(string path)
@@ -2122,7 +2071,7 @@ public static class LazyFileManager
         path = ConvertSimulatedPackagePathToNormalPath(path);
         return IsSecureWritePath(path)
             ? File.Open(path, FileMode.Create)
-            : throw new Exception("Attempted to open stream for create at non-secure path " + path);
+            : throw new Exception($"Attempted to open stream for create at non-secure path {path}");
     }
 
     public static StreamWriter OpenStreamWriter(string path)
@@ -2130,14 +2079,14 @@ public static class LazyFileManager
         path = ConvertSimulatedPackagePathToNormalPath(path);
         return IsSecureWritePath(path)
             ? new StreamWriter(path)
-            : throw new Exception("Attempted to open stream writer at non-secure path " + path);
+            : throw new Exception($"Attempted to open stream writer at non-secure path {path}");
     }
 
     public static void WriteAllText(string path, string text)
     {
         path = ConvertSimulatedPackagePathToNormalPath(path);
         if (!IsSecureWritePath(path))
-            throw new Exception("Attempted to write all text at non-secure path " + path);
+            throw new Exception($"Attempted to write all text at non-secure path {path}");
         File.WriteAllText(path, text);
     }
 
@@ -2151,7 +2100,7 @@ public static class LazyFileManager
         path = ConvertSimulatedPackagePathToNormalPath(path);
         if (!IsSecurePluginWritePath(path))
         {
-            var e = new Exception("Plugin attempted to write all text at non-secure path " + path);
+            var e = new Exception($"Plugin attempted to write all text at non-secure path {path}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -2177,7 +2126,7 @@ public static class LazyFileManager
                 confirmCallback();
             }
             else
-                ConfirmPluginActionWithUser("overwrite file " + path, () =>
+                ConfirmPluginActionWithUser($"overwrite file {path}", () =>
                 {
                     try
                     {
@@ -2218,7 +2167,7 @@ public static class LazyFileManager
     {
         path = ConvertSimulatedPackagePathToNormalPath(path);
         if (!IsSecureWritePath(path))
-            throw new Exception("Attempted to write all bytes at non-secure path " + path);
+            throw new Exception($"Attempted to write all bytes at non-secure path {path}");
         File.WriteAllBytes(path, bytes);
     }
 
@@ -2232,7 +2181,7 @@ public static class LazyFileManager
         path = ConvertSimulatedPackagePathToNormalPath(path);
         if (!IsSecurePluginWritePath(path))
         {
-            var e = new Exception("Plugin attempted to write all bytes at non-secure path " + path);
+            var e = new Exception($"Plugin attempted to write all bytes at non-secure path {path}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -2258,7 +2207,7 @@ public static class LazyFileManager
                 confirmCallback();
             }
             else
-                ConfirmPluginActionWithUser("overwrite file " + path, () =>
+                ConfirmPluginActionWithUser($"overwrite file {path}", () =>
                 {
                     try
                     {
@@ -2299,7 +2248,7 @@ public static class LazyFileManager
     {
         path = ConvertSimulatedPackagePathToNormalPath(path);
         if (!IsSecureWritePath(path))
-            throw new Exception("Attempted to set file attributes at non-secure path " + path);
+            throw new Exception($"Attempted to set file attributes at non-secure path {path}");
         File.SetAttributes(path, attrs);
     }
 
@@ -2309,7 +2258,7 @@ public static class LazyFileManager
         if (!File.Exists(path))
             return;
         if (!IsSecureWritePath(path))
-            throw new Exception("Attempted to delete file at non-secure path " + path);
+            throw new Exception($"Attempted to delete file at non-secure path {path}");
         File.Delete(path);
     }
 
@@ -2324,7 +2273,7 @@ public static class LazyFileManager
             return;
         if (!IsSecurePluginWritePath(path))
         {
-            var e = new Exception("Plugin attempted to delete file at non-secure path " + path);
+            var e = new Exception($"Plugin attempted to delete file at non-secure path {path}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -2348,7 +2297,7 @@ public static class LazyFileManager
             confirmCallback();
         }
         else
-            ConfirmPluginActionWithUser("delete file " + path, () =>
+            ConfirmPluginActionWithUser($"delete file {path}", () =>
             {
                 try
                 {
@@ -2369,14 +2318,12 @@ public static class LazyFileManager
     public static void DoFileCopy(string oldPath, string newPath)
     {
         var fileEntry = GetFileEntry(oldPath);
-        if (fileEntry != null && fileEntry is VarFileEntry)
+        if (fileEntry is VarFileEntry)
         {
             var numArray = new byte[4096];
-            using (var fileEntryStream = OpenStream(fileEntry))
-            {
-                using (var fileStream = OpenStreamForCreate(newPath))
-                    StreamUtils.Copy(fileEntryStream.Stream, fileStream, numArray);
-            }
+            using var fileEntryStream = OpenStream(fileEntry);
+            using var fileStream = OpenStreamForCreate(newPath);
+            StreamUtils.Copy(fileEntryStream.Stream, fileStream, numArray);
         }
         else
             File.Copy(oldPath, newPath);
@@ -2386,10 +2333,10 @@ public static class LazyFileManager
     {
         oldPath = ConvertSimulatedPackagePathToNormalPath(oldPath);
         if (restrictPath && !IsSecureReadPath(oldPath))
-            throw new Exception("Attempted to copy file from non-secure path " + oldPath);
+            throw new Exception($"Attempted to copy file from non-secure path {oldPath}");
         newPath = ConvertSimulatedPackagePathToNormalPath(newPath);
         if (!IsSecureWritePath(newPath))
-            throw new Exception("Attempted to copy file to non-secure path " + newPath);
+            throw new Exception($"Attempted to copy file to non-secure path {newPath}");
         DoFileCopy(oldPath, newPath);
     }
 
@@ -2403,7 +2350,7 @@ public static class LazyFileManager
         oldPath = ConvertSimulatedPackagePathToNormalPath(oldPath);
         if (!IsSecureReadPath(oldPath))
         {
-            var e = new Exception("Attempted to copy file from non-secure path " + oldPath);
+            var e = new Exception($"Attempted to copy file from non-secure path {oldPath}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -2413,7 +2360,7 @@ public static class LazyFileManager
             newPath = ConvertSimulatedPackagePathToNormalPath(newPath);
             if (!IsSecurePluginWritePath(newPath))
             {
-                var e = new Exception("Plugin attempted to copy file to non-secure path " + newPath);
+                var e = new Exception($"Plugin attempted to copy file to non-secure path {newPath}");
                 if (exceptionCallback == null)
                     throw e;
                 exceptionCallback(e);
@@ -2440,7 +2387,7 @@ public static class LazyFileManager
                 }
                 else
                     ConfirmPluginActionWithUser(
-                        "copy file from " + oldPath + " to existing file " + newPath, () =>
+                        $"copy file from {oldPath} to existing file {newPath}", () =>
                         {
                             try
                             {
@@ -2483,7 +2430,7 @@ public static class LazyFileManager
         if (File.Exists(newPath))
         {
             if (!overwrite)
-                throw new Exception("File " + newPath + " exists. Cannot move into");
+                throw new Exception($"File {newPath} exists. Cannot move into");
             File.Delete(newPath);
         }
 
@@ -2494,10 +2441,10 @@ public static class LazyFileManager
     {
         oldPath = ConvertSimulatedPackagePathToNormalPath(oldPath);
         if (!IsSecureWritePath(oldPath))
-            throw new Exception("Attempted to move file from non-secure path " + oldPath);
+            throw new Exception($"Attempted to move file from non-secure path {oldPath}");
         newPath = ConvertSimulatedPackagePathToNormalPath(newPath);
         if (!IsSecureWritePath(newPath))
-            throw new Exception("Attempted to move file to non-secure path " + newPath);
+            throw new Exception($"Attempted to move file to non-secure path {newPath}");
         DoFileMove(oldPath, newPath, overwrite);
     }
 
@@ -2512,7 +2459,7 @@ public static class LazyFileManager
         oldPath = ConvertSimulatedPackagePathToNormalPath(oldPath);
         if (!IsSecurePluginWritePath(oldPath))
         {
-            var e = new Exception("Plugin attempted to move file from non-secure path " + oldPath);
+            var e = new Exception($"Plugin attempted to move file from non-secure path {oldPath}");
             if (exceptionCallback == null)
                 throw e;
             exceptionCallback(e);
@@ -2522,7 +2469,7 @@ public static class LazyFileManager
             newPath = ConvertSimulatedPackagePathToNormalPath(newPath);
             if (!IsSecurePluginWritePath(newPath))
             {
-                var e = new Exception("Plugin attempted to move file to non-secure path " + newPath);
+                var e = new Exception($"Plugin attempted to move file to non-secure path {newPath}");
                 if (exceptionCallback == null)
                     throw e;
                 exceptionCallback(e);
@@ -2550,7 +2497,7 @@ public static class LazyFileManager
                     }
                 }
 
-                ConfirmPluginActionWithUser("move file from " + oldPath + " to " + newPath,
+                ConfirmPluginActionWithUser($"move file from {oldPath} to {newPath}",
                     () =>
                     {
                         try
@@ -2574,107 +2521,7 @@ public static class LazyFileManager
     // private void Awake() => LazyLazyFileManager.singleton = this;
 
     public static void OnDestroy() => ClearAll();
-
-    // public class PackageUIDAndPublisher
-    // {
-    //     public string uid;
-    //     public string publisher;
-    // }
 }
-
-//     public static VarPackage RegisterPackage(string vpath)
-//     {
-//         if (FileManager.debug)
-//         {
-//             Debug.Log("RegisterPackage " + vpath);
-//         }
-//
-//         string uid = LazyFileManager.PackagePathToUid(vpath);
-//         string[] strArray = uid.Split('.');
-//         if (strArray.Length == 3)
-//         {
-//             string creator = strArray[0];
-//             string name = strArray[1];
-//             string str = creator + "." + name;
-//             string s = strArray[2];
-//             try
-//             {
-//                 int version = int.Parse(s);
-//                 if (packagesByUid.ContainsKey(uid))
-//                 {
-//                     SuperController.LogError("Duplicate package uid " + uid + ". Cannot register");
-//                 }
-//                 else
-//                 {
-//                     VarPackageGroup group;
-//                     if (!packageGroups.TryGetValue(str, out group))
-//                     {
-//                         group = new VarPackageGroup(str);
-//                         packageGroups.Add(str, group);
-//                     }
-//
-//                     VarPackage vp = new VarPackage(uid, vpath, group, creator, name, version);
-//                     packagesByUid.Add(uid, vp);
-//                     packagesByPath.Add(vp.Path, vp);
-//                     packagesByPath.Add(vp.SlashPath, vp);
-//                     packagesByPath.Add(vp.FullPath, vp);
-//                     packagesByPath.Add(vp.FullSlashPath, vp);
-//                     group.AddPackage(vp);
-//                     if (vp.Enabled)
-//                     {
-//                         enabledPackages.Add(vp);
-//                         foreach (VarFileEntry fileEntry in vp.FileEntries)
-//                         {
-//                             allVarFileEntries.Add(fileEntry);
-//                             uidToVarFileEntry.Add(fileEntry.Uid, fileEntry);
-//                             if (FileManager.debug)
-//                             {
-//                                 Debug.Log("Add var file with UID " + fileEntry.Uid);
-//                             }
-//
-//                             pathToVarFileEntry.Add(fileEntry.Path, fileEntry);
-//                             pathToVarFileEntry.Add(fileEntry.SlashPath, fileEntry);
-//                             pathToVarFileEntry.Add(fileEntry.FullPath, fileEntry);
-//                             pathToVarFileEntry.Add(fileEntry.FullSlashPath, fileEntry);
-//                         }
-//
-//                         foreach (VarDirectoryEntry directoryEntry in vp.DirectoryEntries)
-//                         {
-//                             allVarDirectoryEntries.Add(directoryEntry);
-//                             if (FileManager.debug)
-//                             {
-//                                 Debug.Log("Add var directory with UID " + directoryEntry.Uid);
-//                             }
-//
-//                             uidToVarDirectoryEntry.Add(directoryEntry.Uid, directoryEntry);
-//                             pathToVarDirectoryEntry.Add(directoryEntry.Path, directoryEntry);
-//                             pathToVarDirectoryEntry.Add(directoryEntry.SlashPath, directoryEntry);
-//                             pathToVarDirectoryEntry.Add(directoryEntry.FullPath, directoryEntry);
-//                             pathToVarDirectoryEntry.Add(directoryEntry.FullSlashPath, directoryEntry);
-//                         }
-//
-//                         varPackagePathToRootVarDirectory.Add(vp.Path, vp.RootDirectory);
-//                         varPackagePathToRootVarDirectory.Add(vp.FullPath, vp.RootDirectory);
-//                     }
-//
-//                     return vp;
-//                 }
-//             }
-//             catch (FormatException)
-//             {
-//                 SuperController.LogError("VAR file " + vpath +
-//                                          " does not use integer version field in name <creator>.<name>.<version>");
-//             }
-//         }
-//         else
-//         {
-//             SuperController.LogError("VAR file " + vpath +
-//                                      " is not named with convention <creator>.<name>.<version>");
-//         }
-//
-//         return null;
-//     }
-// }
 
 /// <summary>
 /// Replaces functions on existing <see cref="FileManager"/> implementation to improve performance:
@@ -2987,7 +2834,7 @@ public class FileManagerPatch
         LazyFileManager.AutoDenyAllPanelsWithSignature(signature);
         return false;
     }
-    
+
     [HarmonyPatch(typeof(FileManager), "AutoDenyAllWithSignature")]
     [HarmonyPrefix]
     public static bool AutoDenyAllWithSignature(string signature)
@@ -3904,237 +3751,11 @@ public class FileManagerPatch
         return false;
     }
 
-    // TODO why does this not work? Looks like it isn't working because of not registering all the addons on startup...
     [HarmonyPatch(typeof(FileManager), nameof(FileManager.Refresh))]
     [HarmonyPrefix]
     public static bool Refresh()
     {
         LazyFileManager.Refresh();
         return false;
-        // VaMPerformancePlugin.PluginLogger.LogDebug("Patched FileManager.Refresh() running...");
-        // if (FileManager.debug)
-        // {
-        //     Debug.Log("FileManager Refresh()");
-        // }
-        //
-        // // TODO can we pull this out to avoid re-inits?
-        // // FileManagerStatics.Init();
-        //
-        // // Pull out the static fields we need
-        // var packagesByUid = FileManagerStatics.packagesByUid;
-        // var packagesByPath = FileManagerStatics.packagesByPath;
-        // var packageGroups = FileManagerStatics.packageGroups;
-        // var enabledPackages = FileManagerStatics.enabledPackages;
-        // VaMPerformancePlugin.PluginLogger.LogDebug(new StringBuilder("Variables: \n")
-        //     .AppendLine($"packagesByUid: {packagesByUid}")
-        //     .AppendLine($"packagesByPath: {packagesByPath}")
-        //     .AppendLine($"packageGroups: {packageGroups}")
-        //     .AppendLine($"enabledPackages: {enabledPackages}")
-        //     .ToString());
-        //
-        // var packageFolder = FileManagerStatics.packageFolder;
-        // var userPrefsFolder = FileManagerStatics.userPrefsFolder;
-        // var packagesEnabled = FileManagerStatics.packagesEnabled;
-        // var onRefreshHandlers = FileManagerStatics.onRefreshHandlers;
-        // VaMPerformancePlugin.PluginLogger.LogDebug(new StringBuilder("Variables: \n")
-        //     .AppendLine($"packageFolder: {packageFolder}")
-        //     .AppendLine($"userPrefsFolder: {userPrefsFolder}")
-        //     .AppendLine($"packagesEnabled: {packagesEnabled}")
-        //     .AppendLine($"onRefreshHandlers: {onRefreshHandlers}")
-        //     .ToString());
-        //
-        // bool packagesChanged = false;
-        // float startMillis = 0.0f;
-        //
-        // if (!VaMPerformancePlugin.Options.EnabledGlobalStopwatch.Value)
-        // {
-        //     startMillis = GlobalStopwatch.GetElapsedMilliseconds();
-        // }
-        //
-        // try
-        // {
-        //     if (!Directory.Exists(packageFolder))
-        //     {
-        //         FileManager.CreateDirectory(packageFolder);
-        //     }
-        //
-        //     if (!Directory.Exists(userPrefsFolder))
-        //     {
-        //         FileManager.CreateDirectory(userPrefsFolder);
-        //     }
-        //
-        //     if (Directory.Exists(packageFolder))
-        //     {
-        //         IEnumerable<string> directories = [];
-        //         IEnumerable<string> files = [];
-        //         if (packagesEnabled)
-        //         {
-        //             // TODO why both?
-        //             directories = Directory.GetDirectories(FileManagerStatics.packageFolder, "*.var",
-        //                 SearchOption.AllDirectories);
-        //             files = Directory.GetFiles(FileManagerStatics.packageFolder, "*.var", SearchOption.AllDirectories);
-        //             // directories = EnumerateDirectories(packageFolder, "*.var", SearchOption.AllDirectories);
-        //             // files = EnumerateFiles(packageFolder, "*.var", SearchOption.AllDirectories);
-        //         }
-        //         else if (FileManager.demoPackagePrefixes != null)
-        //         {
-        //             IEnumerable<string> result = new List<string>();
-        //             foreach (string demoPackagePrefix in FileManager.demoPackagePrefixes)
-        //             {
-        //                 IEnumerable<string> enumerateFiles = EnumerateFiles(packageFolder,
-        //                     demoPackagePrefix + "*.var", SearchOption.AllDirectories);
-        //                 result = result.Concat(enumerateFiles);
-        //             }
-        //
-        //             files = result;
-        //         }
-        //
-        //         HashSet<string> registeredPacakges = new();
-        //         HashSet<string> unregisteredPackages = new();
-        //
-        //         foreach (string directory in directories)
-        //         {
-        //             registeredPacakges.Add(directory);
-        //             VarPackage vp;
-        //             if (packagesByPath.TryGetValue(directory, out vp))
-        //             {
-        //                 bool previouslyEnabled = enabledPackages.Contains(vp);
-        //                 bool enabled = vp.Enabled;
-        //                 if (!previouslyEnabled && enabled || previouslyEnabled && !enabled || !vp.IsSimulated)
-        //                 {
-        //                     FileManager.UnregisterPackage(vp);
-        //                     unregisteredPackages.Add(directory);
-        //                 }
-        //             }
-        //             else
-        //             {
-        //                 unregisteredPackages.Add(directory);
-        //             }
-        //         }
-        //
-        //         if (files != null)
-        //         {
-        //             foreach (string file in files)
-        //             {
-        //                 registeredPacakges.Add(file);
-        //                 VarPackage vp;
-        //                 if (packagesByPath.TryGetValue(file, out vp))
-        //                 {
-        //                     bool inEnabledPackages = enabledPackages.Contains(vp);
-        //                     bool enabled = vp.Enabled;
-        //                     if (!inEnabledPackages && enabled || inEnabledPackages && !enabled || vp.IsSimulated)
-        //                     {
-        //                         FileManager.UnregisterPackage(vp);
-        //                         unregisteredPackages.Add(file);
-        //                     }
-        //                 }
-        //                 else
-        //                 {
-        //                     unregisteredPackages.Add(file);
-        //                 }
-        //             }
-        //         }
-        //
-        //         HashSet<VarPackage> packagesToRemove = new();
-        //         foreach (VarPackage varPackage in packagesByUid.Values)
-        //         {
-        //             if (!registeredPacakges.Contains(varPackage.Path))
-        //             {
-        //                 packagesToRemove.Add(varPackage);
-        //             }
-        //         }
-        //
-        //         foreach (VarPackage vp in packagesToRemove)
-        //         {
-        //             VaMPerformancePlugin.PluginLogger.LogDebug($"Unregistering package: {vp}");
-        //             FileManager.UnregisterPackage(vp);
-        //             packagesChanged = true;
-        //         }
-        //
-        //         foreach (string vpath in unregisteredPackages)
-        //         {
-        //             VaMPerformancePlugin.PluginLogger.LogDebug($"Registering package: {vpath}");
-        //             FileManagerStatics.RegisterPackage(vpath);
-        //             packagesChanged = true;
-        //         }
-        //
-        //         if (packagesChanged)
-        //         {
-        //             foreach (VarPackage varPackage in packagesByUid.Values)
-        //             {
-        //                 varPackage.LoadMetaData();
-        //             }
-        //
-        //             foreach (VarPackageGroup varPackageGroup in packageGroups.Values)
-        //             {
-        //                 varPackageGroup.Init();
-        //             }
-        //         }
-        //
-        //         if (!VaMPerformancePlugin.Options.EnabledGlobalStopwatch.Value)
-        //         {
-        //             float elapsedMilliseconds = GlobalStopwatch.GetElapsedMilliseconds();
-        //             float packageScanningDurationMillis = elapsedMilliseconds - startMillis;
-        //             Debug.Log(new StringBuilder().Append("Scanned ")
-        //                 .Append(packagesByUid.Count)
-        //                 .Append(" packages in ")
-        //                 .Append(packageScanningDurationMillis.ToString("F1"))
-        //                 .Append(" ms")
-        //                 .ToString());
-        //             startMillis = elapsedMilliseconds;
-        //         }
-        //
-        //         foreach (VarPackage varPackage in packagesByUid.Values)
-        //         {
-        //             if (varPackage.forceRefresh)
-        //             {
-        //                 Debug.Log("Force refresh of package " + varPackage.Uid);
-        //                 packagesChanged = true;
-        //                 varPackage.forceRefresh = false;
-        //             }
-        //         }
-        //
-        //         if (packagesChanged)
-        //         {
-        //             Debug.Log("Package changes detected");
-        //             onRefreshHandlers?.Invoke();
-        //         }
-        //         else
-        //         {
-        //             Debug.Log("No package changes detected");
-        //         }
-        //
-        //         if (!VaMPerformancePlugin.Options.EnabledGlobalStopwatch.Value)
-        //         {
-        //             float elapsedMilliseconds2 = GlobalStopwatch.GetElapsedMilliseconds();
-        //             Debug.Log(new StringBuilder().Append("Refresh Handlers took ")
-        //                 .Append((elapsedMilliseconds2 - startMillis).ToString("F1"))
-        //                 .Append(" ms")
-        //                 .ToString());
-        //             startMillis = elapsedMilliseconds2;
-        //         }
-        //     }
-        // }
-        // catch (TargetInvocationException ex)
-        // {
-        //     VaMPerformancePlugin.PluginLogger.LogError(ex);
-        // }
-        // catch (Exception ex)
-        // {
-        //     SuperController.LogError(new StringBuilder().AppendLine("Exception during package refresh ")
-        //         .Append(ex)
-        //         .ToString());
-        // }
-        //
-        // if (!VaMPerformancePlugin.Options.EnabledGlobalStopwatch.Value)
-        // {
-        //     Debug.Log(new StringBuilder().Append("Refresh package handlers took ")
-        //         .Append((GlobalStopwatch.GetElapsedMilliseconds() - startMillis).ToString("F1"))
-        //         .Append(" ms")
-        //         .ToString());
-        // }
-        //
-        // FileManagerStatics.lastPackageRefreshTime = DateTime.Now;
-        // return false;
     }
 }
