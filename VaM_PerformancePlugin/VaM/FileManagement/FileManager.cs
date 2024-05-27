@@ -43,6 +43,12 @@ public static class LazyFileManager
     //
     // end re-implementation
 
+    // replacement for "singleton"
+    // should be called once Unity is finished creating this instance,
+    // so everything here should be properly initialized by then
+    // this is to prevent weird issues with MVRPlugin complaining about a HashSet being modified mid-iteration
+    private static bool _isAwake = false;
+
     // TODO is there a way to keep this in sync with normal VaM code?
     public const string packageFolder = "AddonPackages";
     public const string userPrefsFolder = "AddonPackagesUserPrefs";
@@ -673,7 +679,9 @@ public static class LazyFileManager
     {
         foreach (var ucp in new List<UserConfirmPanel>(
                      activeUserConfirmPanels))
+        {
             DestroyUserConfirmPanel(ucp);
+        }
     }
 
     public static void UserConfirm(
@@ -790,8 +798,14 @@ public static class LazyFileManager
         UserActionCallback autoDenyCallback,
         UserActionCallback denyStickyCallback)
     {
-        UserConfirm(prompt, confirmCallback, autoConfirmCallback, confirmStickyCallback,
-            denyCallback, autoDenyCallback, denyStickyCallback);
+        if (_isAwake)
+        {
+            UserConfirm(prompt, confirmCallback, autoConfirmCallback, confirmStickyCallback,
+                denyCallback, autoDenyCallback, denyStickyCallback);
+            return;
+        }
+
+        denyCallback();
     }
 
     public static void AutoConfirmAllPanelsWithSignature(string signature)
@@ -806,7 +820,9 @@ public static class LazyFileManager
         }
 
         foreach (var userConfirmPanel in userConfirmPanelList)
+        {
             userConfirmPanel.AutoConfirm();
+        }
     }
 
     public static void ConfirmAllPanelsWithSignature(string signature, bool isPlugin)
@@ -821,7 +837,10 @@ public static class LazyFileManager
         }
 
         foreach (var userConfirmPanel in userConfirmPanelList)
+        {
             userConfirmPanel.Confirm();
+        }
+
         if (!isPlugin)
         {
             return;
@@ -832,11 +851,16 @@ public static class LazyFileManager
 
     public static void AutoConfirmAllWithSignature(string signature)
     {
-        AutoConfirmAllPanelsWithSignature(signature);
+        if (_isAwake)
+        {
+            AutoConfirmAllPanelsWithSignature(signature);
+        }
     }
 
     public static void AutoDenyAllPanelsWithSignature(string signature)
     {
+        if (!_isAwake) return;
+        
         List<UserConfirmPanel> userConfirmPanelList = [];
         foreach (var userConfirmPanel in activeUserConfirmPanels)
         {
@@ -847,7 +871,9 @@ public static class LazyFileManager
         }
 
         foreach (var userConfirmPanel in userConfirmPanelList)
+        {
             userConfirmPanel.AutoDeny();
+        }
     }
 
     public static void DenyAllPanelsWithSignature(string signature, bool isPlugin)
@@ -862,7 +888,10 @@ public static class LazyFileManager
         }
 
         foreach (var userConfirmPanel in userConfirmPanelList)
+        {
             userConfirmPanel.Deny();
+        }
+
         if (!isPlugin)
         {
             return;
@@ -971,7 +1000,13 @@ public static class LazyFileManager
         UserActionCallback confirmCallback,
         UserActionCallback denyCallback)
     {
-        UserConfirmPluginAction(prompt, confirmCallback, denyCallback);
+        if (_isAwake)
+        {
+            UserConfirmPluginAction(prompt, confirmCallback, denyCallback);
+            return;
+        }
+
+        denyCallback();
     }
 
     private const string FilePrefix = "file:///";
@@ -1613,7 +1648,9 @@ public static class LazyFileManager
         }
 
         foreach (var directory in Directory.GetDirectories(dir))
+        {
             FindRegularFilesRegex(directory, regex, foundFiles);
+        }
     }
 
     public static void FindVarFiles(string dir, string pattern, List<FileEntry> foundFiles)
@@ -1855,7 +1892,10 @@ public static class LazyFileManager
     {
         var length = Directory.GetFiles(path).Length;
         foreach (var directory in Directory.GetDirectories(path))
+        {
             length += FolderContentsCount(directory);
+        }
+
         return length;
     }
 
@@ -1950,6 +1990,7 @@ public static class LazyFileManager
         }
 
         foreach (var varDirectoryEntry in varDirectories)
+        {
             cutsForDirectory.Add(new()
             {
                 directoryEntry = varDirectoryEntry,
@@ -1959,6 +2000,8 @@ public static class LazyFileManager
                 displayName = varDirectoryEntry.InternalSlashPath,
                 path = varDirectoryEntry.SlashPath
             });
+        }
+
         return cutsForDirectory;
     }
 
@@ -2163,7 +2206,10 @@ public static class LazyFileManager
         }
 
         foreach (var file in directoryEntry.GetFiles(pattern))
+        {
             stringList.Add($"{dir}\\{file.Name}");
+        }
+
         return stringList.ToArray();
     }
 
@@ -3059,9 +3105,13 @@ public static class LazyFileManager
         }
     }
 
-    // private void Awake() => LazyLazyFileManager.singleton = this;
+    public static void Awake() => _isAwake = true;
 
-    public static void OnDestroy() => ClearAll();
+    public static void OnDestroy()
+    {
+        _isAwake = false;
+        ClearAll();
+    }
 }
 
 /// <summary>
@@ -4279,7 +4329,7 @@ public class FileManagerPatch
     [HarmonyPrefix]
     public static bool Awake()
     {
-        // LazyFileManager.Awake();
+        LazyFileManager.Awake();
         return false;
     }
 
