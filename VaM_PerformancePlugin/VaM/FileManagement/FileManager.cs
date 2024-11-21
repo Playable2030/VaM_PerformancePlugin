@@ -17,13 +17,27 @@ using Object = UnityEngine.Object;
 
 namespace VaM_PerformancePlugin.VaM.FileManagement;
 
+// stuff that used to be in "instance" of FileManager
+// pulling it out of FileManager seems more appropriate
+// as this is a side effect of how file management UI works vs actual file management
+public class UserConfirmFields
+{
+    public Transform userConfirmContainer;
+    public Transform userConfirmPrefab;
+    public Transform userConfirmPluginActionPrefab;
+
+    public AsyncFlag userConfirmFlag;
+    public HashSet<UserConfirmPanel> activeUserConfirmPanels;
+}
+
 // Rewrite of FileManager to be "lazier":
 // - Avoids using a singleton in favor of static variables
 // - Avoid a full refresh when possible
 // - Use lazy File I/O and watchers that run on separate threads (if possible)
 // - Serialize caches on shutdown and load them on startup
 // Note: This is avoiding using the Harmony annotations/code here, and keeping that separate in an "ugly" "glue" class
-public static class LazyFileManager
+[SuppressMessage("ReSharper", "InconsistentNaming")]
+public class LazyFileManager
 {
     // quick and dirty re-implementation of newer dotnet stdlibs
     //
@@ -47,7 +61,7 @@ public static class LazyFileManager
     // should be called once Unity is finished creating this instance,
     // so everything here should be properly initialized by then
     // this is to prevent weird issues with MVRPlugin complaining about a HashSet being modified mid-iteration
-    private static bool _isAwake = false;
+    // private static bool _isAwake = false;
 
     // TODO is there a way to keep this in sync with normal VaM code?
     public const string packageFolder = "AddonPackages";
@@ -75,13 +89,16 @@ public static class LazyFileManager
     public static HashSet<string> secureReadPaths = [];
     public static HashSet<string> secureInternalWritePaths = [];
     public static HashSet<string> securePluginWritePaths = [];
+
     public static HashSet<string> pluginWritePathsThatDoNotNeedConfirm = [];
-    public static Transform userConfirmContainer;
-    public static Transform userConfirmPrefab;
-    public static Transform userConfirmPluginActionPrefab;
+
+    // public static Transform userConfirmContainer;
+    // public static Transform userConfirmPrefab;
+    // public static Transform userConfirmPluginActionPrefab;
     public static Dictionary<string, string> pluginHashToPluginPath = new();
-    public static AsyncFlag userConfirmFlag;
-    public static HashSet<UserConfirmPanel> activeUserConfirmPanels = [];
+
+    // public static AsyncFlag userConfirmFlag;
+    // public static HashSet<UserConfirmPanel> activeUserConfirmPanels = [];
     public static HashSet<string> userConfirmedPlugins = [];
     public static HashSet<string> userDeniedPlugins = [];
     public static LinkedList<string> loadDirStack = [];
@@ -627,7 +644,7 @@ public static class LazyFileManager
         string pluginHash = null;
         for (var index = 0; index < stackTrace.FrameCount; ++index)
         {
-            var name = stackTrace.GetFrame(index).GetMethod().DeclaringType.Assembly.GetName().Name;
+            var name = stackTrace.GetFrame(index).GetMethod().DeclaringType?.Assembly.GetName().Name;
             if (!name.StartsWith("MVRPlugin_"))
             {
                 continue;
@@ -652,33 +669,33 @@ public static class LazyFileManager
     public static void DestroyUserConfirmPanel(UserConfirmPanel ucp)
     {
         Object.Destroy(ucp.gameObject);
-        activeUserConfirmPanels.Remove(ucp);
-        if (activeUserConfirmPanels.Count != 0 || userConfirmFlag == null)
+        _userConfirmFields.activeUserConfirmPanels.Remove(ucp);
+        if (_userConfirmFields.activeUserConfirmPanels.Count != 0 || _userConfirmFields.userConfirmFlag == null)
         {
             return;
         }
 
-        userConfirmFlag.Raise();
-        userConfirmFlag = null;
+        _userConfirmFields.userConfirmFlag.Raise();
+        _userConfirmFields.userConfirmFlag = null;
     }
 
     public static void CreateUserConfirmFlag()
     {
-        if (userConfirmFlag != null ||
+        if (_userConfirmFields.userConfirmFlag != null ||
             !(SuperController.singleton != null))
         {
             return;
         }
 
-        userConfirmFlag = new("UserConfirm");
-        SuperController.singleton.SetLoadingIconFlag(userConfirmFlag);
-        SuperController.singleton.PauseAutoSimulation(userConfirmFlag);
+        _userConfirmFields.userConfirmFlag = new("UserConfirm");
+        SuperController.singleton.SetLoadingIconFlag(_userConfirmFields.userConfirmFlag);
+        SuperController.singleton.PauseAutoSimulation(_userConfirmFields.userConfirmFlag);
     }
 
     public static void DestroyAllUserConfirmPanels()
     {
         foreach (var ucp in new List<UserConfirmPanel>(
-                     activeUserConfirmPanels))
+                     _userConfirmFields.activeUserConfirmPanels))
         {
             DestroyUserConfirmPanel(ucp);
         }
@@ -693,19 +710,20 @@ public static class LazyFileManager
         UserActionCallback autoDenyCallback,
         UserActionCallback denyStickyCallback)
     {
-        if (userConfirmContainer &&
-            userConfirmPrefab)
+       if (_userConfirmFields.userConfirmContainer &&
+            _userConfirmFields.userConfirmPrefab)
         {
-            activeUserConfirmPanels ??= [];
+            _userConfirmFields.activeUserConfirmPanels ??= [];
             CreateUserConfirmFlag();
-            var transform = Object.Instantiate(userConfirmPrefab, userConfirmContainer, false);
+            var transform = Object.Instantiate(_userConfirmFields.userConfirmPrefab,
+                _userConfirmFields.userConfirmContainer, false);
             transform.SetAsFirstSibling();
             var ucp = transform.GetComponent<UserConfirmPanel>();
-            if (ucp)
+            if (ucp is not null)
             {
                 ucp.signature = prompt;
                 ucp.SetPrompt(prompt);
-                activeUserConfirmPanels.Add(ucp);
+                _userConfirmFields.activeUserConfirmPanels.Add(ucp);
                 ucp.SetConfirmCallback(() =>
                 {
                     DestroyUserConfirmPanel(ucp);
@@ -798,7 +816,7 @@ public static class LazyFileManager
         UserActionCallback autoDenyCallback,
         UserActionCallback denyStickyCallback)
     {
-        if (_isAwake)
+        if (_userConfirmFields != null)
         {
             UserConfirm(prompt, confirmCallback, autoConfirmCallback, confirmStickyCallback,
                 denyCallback, autoDenyCallback, denyStickyCallback);
@@ -811,7 +829,7 @@ public static class LazyFileManager
     public static void AutoConfirmAllPanelsWithSignature(string signature)
     {
         List<UserConfirmPanel> userConfirmPanelList = [];
-        foreach (var userConfirmPanel in activeUserConfirmPanels)
+        foreach (var userConfirmPanel in _userConfirmFields.activeUserConfirmPanels)
         {
             if (userConfirmPanel.signature == signature)
             {
@@ -828,7 +846,7 @@ public static class LazyFileManager
     public static void ConfirmAllPanelsWithSignature(string signature, bool isPlugin)
     {
         List<UserConfirmPanel> userConfirmPanelList = [];
-        foreach (var userConfirmPanel in activeUserConfirmPanels)
+        foreach (var userConfirmPanel in _userConfirmFields.activeUserConfirmPanels)
         {
             if (userConfirmPanel.signature == signature)
             {
@@ -851,7 +869,7 @@ public static class LazyFileManager
 
     public static void AutoConfirmAllWithSignature(string signature)
     {
-        if (_isAwake)
+        if (_userConfirmFields != null)
         {
             AutoConfirmAllPanelsWithSignature(signature);
         }
@@ -859,10 +877,10 @@ public static class LazyFileManager
 
     public static void AutoDenyAllPanelsWithSignature(string signature)
     {
-        if (!_isAwake) return;
-        
+        if (_userConfirmFields?.activeUserConfirmPanels == null) return;
+
         List<UserConfirmPanel> userConfirmPanelList = [];
-        foreach (var userConfirmPanel in activeUserConfirmPanels)
+        foreach (var userConfirmPanel in _userConfirmFields.activeUserConfirmPanels)
         {
             if (userConfirmPanel.signature == signature)
             {
@@ -879,7 +897,7 @@ public static class LazyFileManager
     public static void DenyAllPanelsWithSignature(string signature, bool isPlugin)
     {
         List<UserConfirmPanel> userConfirmPanelList = [];
-        foreach (var userConfirmPanel in activeUserConfirmPanels)
+        foreach (var userConfirmPanel in _userConfirmFields.activeUserConfirmPanels)
         {
             if (userConfirmPanel.signature == signature)
             {
@@ -910,8 +928,8 @@ public static class LazyFileManager
         UserActionCallback confirmCallback,
         UserActionCallback denyCallback)
     {
-        if (userConfirmContainer != null &&
-            userConfirmPluginActionPrefab != null)
+        if (_userConfirmFields.userConfirmContainer != null &&
+            _userConfirmFields.userConfirmPluginActionPrefab != null)
         {
             var pluginHash = GetPluginHash();
             if (pluginHash == null)
@@ -934,7 +952,8 @@ public static class LazyFileManager
                 }
             }
 
-            var transform = Object.Instantiate(userConfirmPluginActionPrefab, userConfirmContainer, false);
+            var transform = Object.Instantiate(_userConfirmFields.userConfirmPluginActionPrefab,
+                _userConfirmFields.userConfirmContainer, false);
             transform.SetAsFirstSibling();
             var ucp = transform.GetComponent<UserConfirmPanel>();
             if (ucp != null && pluginHash != null)
@@ -947,7 +966,7 @@ public static class LazyFileManager
 
                 ucp.signature = pluginHash;
                 ucp.SetPrompt($"Plugin {str}\nwants to {prompt}");
-                activeUserConfirmPanels.Add(ucp);
+                _userConfirmFields.activeUserConfirmPanels.Add(ucp);
                 ucp.SetConfirmCallback(() =>
                 {
                     DestroyUserConfirmPanel(ucp);
@@ -1000,7 +1019,7 @@ public static class LazyFileManager
         UserActionCallback confirmCallback,
         UserActionCallback denyCallback)
     {
-        if (_isAwake)
+        if (_userConfirmFields != null)
         {
             UserConfirmPluginAction(prompt, confirmCallback, denyCallback);
             return;
@@ -1023,6 +1042,7 @@ public static class LazyFileManager
 
     private static readonly Regex PackageUrlPrefixRegex = new(".*:/");
     private static readonly Regex PackageUrlSuffixRegex = new(":/.*");
+    private static UserConfirmFields _userConfirmFields = new();
 
     public static bool IsPackagePath(string path)
     {
@@ -1223,9 +1243,9 @@ public static class LazyFileManager
         PushLoadDir(
             fileEntry == null
                 ? Path.GetDirectoryName(GetFullPath(path))
-                    .Replace($"{Path.GetFullPath(".")}\\", string.Empty)
+                    ?.Replace($"{Path.GetFullPath(".")}\\", string.Empty)
                 : (!(fileEntry is VarFileEntry)
-                    ? Path.GetDirectoryName(fileEntry.FullPath).Replace($"{Path.GetFullPath(".")}\\", string.Empty)
+                    ? Path.GetDirectoryName(fileEntry.FullPath)?.Replace($"{Path.GetFullPath(".")}\\", string.Empty)
                     : Path.GetDirectoryName(fileEntry.Uid)), restrictPath);
     }
 
@@ -1387,7 +1407,8 @@ public static class LazyFileManager
         }
 
         CurrentSaveDir = !restrictPath || IsSecureWritePath(path)
-            ? Path.GetDirectoryName(GetFullPath(path)).Replace($"{Path.GetFullPath(".")}\\", string.Empty)
+            ? Path.GetDirectoryName(GetFullPath(path))
+                ?.Replace($"{Path.GetFullPath(".")}\\", string.Empty)
                 .Replace('\\', '/')
             : throw new($"Attempted to set save dir from non-secure path {path}");
     }
@@ -3105,11 +3126,16 @@ public static class LazyFileManager
         }
     }
 
-    public static void Awake() => _isAwake = true;
+    private bool awake => _userConfirmFields != null;
 
-    public static void OnDestroy()
+    public void Awake()
     {
-        _isAwake = false;
+        // _userConfirmFields = new();
+    }
+
+    public void OnDestroy()
+    {
+        _userConfirmFields = null;
         ClearAll();
     }
 }
@@ -3124,12 +3150,102 @@ public static class LazyFileManager
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class FileManagerPatch
 {
+    // TODO Look into how unity objects like Transforms are init'd, as well as MonoBehavior
+    private static LazyFileManager _lazyFileManager;
+
     // [HarmonyPatch(typeof(FileManager), MethodType.Constructor)]
     // [HarmonyPostfix]
     // private static void CTOR()
     // {
     //     FileManagerStatics.Init();
     // }
+
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmContainer), MethodType.Getter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmContainer_get(ref Transform __result)
+    // {
+    //     __result = LazyFileManager.userConfirmContainer;
+    //     return false;
+    // }
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmContainer), MethodType.Setter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmContainer_set(Transform value)
+    // {
+    //     LazyFileManager.userConfirmContainer = value;
+    //     return false;
+    // }
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmPrefab), MethodType.Getter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmPrefab_get(ref Transform __result)
+    // {
+    //     __result = LazyFileManager.userConfirmPrefab;
+    //     return false;
+    // }
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmPrefab), MethodType.Setter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmPrefab_set(Transform value)
+    // {
+    //     LazyFileManager.userConfirmPrefab = value;
+    //     return false;
+    // }
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmPluginActionPrefab), MethodType.Getter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmPluginActionPrefab_get(ref Transform __result)
+    // {
+    //     __result = LazyFileManager.userConfirmPluginActionPrefab;
+    //     return false;
+    // }
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmPluginActionPrefab), MethodType.Setter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmPluginActionPrefab_set(Transform value)
+    // {
+    //     LazyFileManager.userConfirmPluginActionPrefab = value;
+    //     return false;
+    // }
+
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmFlag), MethodType.Getter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmPluginActionPrefab_get(ref Transform __result)
+    // {
+    //     __result = LazyFileManager.userConfirmFlag;
+    //     return false;
+    // }
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.userConfirmFlag), MethodType.Setter)]
+    // [HarmonyPrefix]
+    // public static bool userConfirmPluginActionPrefab_set(Transform value)
+    // {
+    //     LazyFileManager.userConfirmFlag = value;
+    //     return false;
+    // }  
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.activeUserConfirmPanels), MethodType.Getter)]
+    // [HarmonyPrefix]
+    // public static bool activeUserConfirmPanels_get(ref Transform __result)
+    // {
+    //     __result = LazyFileManager.activeUserConfirmPanels;
+    //     return false;
+    // }
+    //
+    // [HarmonyPatch(nameof(FileManager), nameof(FileManager.activeUserConfirmPanels), MethodType.Setter)]
+    // [HarmonyPrefix]
+    // public static bool activeUserConfirmPanels_set(Transform value)
+    // {
+    //     LazyFileManager.activeUserConfirmPanels = value;
+    //     return false;
+    // }
+
+
+    [HarmonyPrepare]
+    public static void Prepare()
+    {
+        _lazyFileManager = new();
+    }
 
     [HarmonyPatch(typeof(FileManager), nameof(FileManager.GetFullPath))]
     [HarmonyPrefix]
@@ -3139,9 +3255,7 @@ public class FileManagerPatch
         return false;
     }
 
-    [HarmonyPatch(typeof(FileManager),
-        "packagePathToUid"
-    )]
+    [HarmonyPatch(typeof(FileManager), "packagePathToUid")]
     [HarmonyPrefix]
     public static bool packagePathToUid(ref string __result, string vpath)
     {
@@ -4329,7 +4443,7 @@ public class FileManagerPatch
     [HarmonyPrefix]
     public static bool Awake()
     {
-        LazyFileManager.Awake();
+        _lazyFileManager.Awake();
         return false;
     }
 
@@ -4338,7 +4452,7 @@ public class FileManagerPatch
     [HarmonyPrefix]
     public static bool OnDestroy()
     {
-        LazyFileManager.OnDestroy();
+        _lazyFileManager.OnDestroy();
         return false;
     }
 
