@@ -71,6 +71,7 @@ public class VaMPerformancePlugin : BaseUnityPlugin
         _harmony.PatchAll(typeof(LocalizatronPatch));
         _harmony.PatchAll(typeof(SuperControllerPatch));
         _harmony.PatchAll(typeof(UnityThreadHelperPatch));
+        _harmony.PatchAll(typeof(VarPackagePatch));
 
         Logger.LogDebug($"End patching...");
     }
