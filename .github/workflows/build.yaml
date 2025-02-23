@@ -45,8 +45,8 @@ jobs:
 
       - name: Add DLL to ZIP
         run: |
-          New-Item -ItemType Directory BepInEx/plugins/
-          Copy-Item VaM_PerformancePlugin/bin/Release/net35/VaM_PerformancePlugin.dll BepInEx/plugins/VaM_PerformancePlugin.dll
+          New-Item -ItemType Directory BepInEx/plugins/VaM_PerformancePlugin
+          Copy-Item VaM_PerformancePlugin/bin/Release/net35/VaM_PerformancePlugin.dll BepInEx/plugins/VaM_PerformancePlugin/VaM_PerformancePlugin.dll
           Compress-Archive -Path ./BepInEx/ -Update -DestinationPath BepInEx_win_x64_5.4.23.2.zip
           Move-Item BepInEx_win_x64_5.4.23.2.zip BepInEx_win_x64_5.4.23.2_with_VaM_PerformancePlugin.zip
 
