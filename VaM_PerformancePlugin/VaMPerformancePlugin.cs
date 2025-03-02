@@ -67,9 +67,21 @@ public class VaMPerformancePlugin : BaseUnityPlugin
                 $"Not patching {typeof(GlobalStopwatchPatch)}due to {Options.EnabledGlobalStopwatch.Definition} setting");
         }
 
-        // _harmony.PatchAll(typeof(ImageLoaderThreadedPatch));
-        _harmony.PatchAll(typeof(LocalizatronPatch));
-        _harmony.PatchAll(typeof(SuperControllerPatch));
+        if (Options.EnabledImageLoaderPatch.Value)
+        {
+            // TODO this prevents images from loading entirely. find out why
+            // _harmony.PatchAll(typeof(ImageLoaderThreadedPatch));
+        }
+        else
+        {
+            Logger.LogDebug(
+                $"Not patching {typeof(ImageLoaderThreadedPatch)}due to {Options.EnabledImageLoaderPatch.Definition} setting");
+        }
+
+
+        // _harmony.PatchAll(typeof(LocalizatronPatch));
+        _harmony.PatchAll(typeof(MirrorCopyPhysicsComponentsPatch));
+        // _harmony.PatchAll(typeof(SuperControllerPatch));
         _harmony.PatchAll(typeof(UnityThreadHelperPatch));
         _harmony.PatchAll(typeof(VarPackagePatch));
 
