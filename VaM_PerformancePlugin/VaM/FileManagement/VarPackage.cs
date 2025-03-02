@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using HarmonyLib;
 using MVR.FileManagement;
 using SimpleJSON;
+using VaM_PerformancePlugin.extra;
 
 namespace VaM_PerformancePlugin.VaM.FileManagement;
 
@@ -81,5 +83,12 @@ public class VarPackagePatch
         }
         
         return false;
+    }
+    
+    [HarmonyPatch]
+    [HarmonyFinalizer]
+    public static Exception Finalizer(Exception __exception)
+    {
+        return new PluginException("VarPackagePatch had an exception", __exception);
     }
 }

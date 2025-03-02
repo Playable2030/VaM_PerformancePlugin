@@ -1,8 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using HarmonyLib;
 using UnityEngine;
+using VaM_PerformancePlugin.extra;
+using Object = UnityEngine.Object;
 
 namespace VaM_PerformancePlugin.VaM;
 
@@ -230,5 +233,11 @@ public class MirrorCopyPhysicsComponentsPatch
         boxCollider.center = vector3;
         boxCollider.size = component.size;
     }
-
+    
+    [HarmonyPatch]
+    [HarmonyFinalizer]
+    public static Exception Finalizer(Exception __exception)
+    {
+        return new PluginException("MirrorCopyPhysicsComponents had an exception", __exception);
+    }
 }

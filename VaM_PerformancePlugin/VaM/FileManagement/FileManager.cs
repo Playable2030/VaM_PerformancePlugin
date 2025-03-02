@@ -11,6 +11,7 @@ using HarmonyLib;
 using MVR.FileManagement;
 using MVR.FileManagementSecure;
 using UnityEngine;
+using VaM_PerformancePlugin.extra;
 using VaM_PerformancePlugin.Inlined;
 using Debug = UnityEngine.Debug;
 using Object = UnityEngine.Object;
@@ -4462,5 +4463,12 @@ public class FileManagerPatch
     {
         LazyFileManager.Refresh();
         return false;
+    }
+
+    [HarmonyPatch]
+    [HarmonyFinalizer]
+    public static Exception Finalizer(Exception __exception)
+    {
+        return new PluginException("FileManagerPatch had an exception", __exception);
     }
 }

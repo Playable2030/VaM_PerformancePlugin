@@ -1,5 +1,7 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using HarmonyLib;
+using VaM_PerformancePlugin.extra;
 
 namespace VaM_PerformancePlugin.VaM;
 
@@ -27,5 +29,12 @@ public class GenerateDAZMorphsControlUIPatch
         __instance.onlyShowFavorites = Options.Character_onlyShowFavorites.Value;
         __instance.onlyShowLatest = Options.Character_onlyShowLatest.Value;
         VaMPerformancePlugin.PluginLogger.LogDebug("Successfully finished patched Awake() for GenerateDAZMorphsControlUI");
+    }
+    
+    [HarmonyPatch]
+    [HarmonyFinalizer]
+    public static Exception Finalizer(Exception __exception)
+    {
+        return new PluginException("GenerateDAZMorphsControlUIPatch had an exception", __exception);
     }
 }

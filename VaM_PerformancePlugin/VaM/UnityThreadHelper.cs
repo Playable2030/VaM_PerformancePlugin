@@ -1,9 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Xml;
 using HarmonyLib;
 using JetBrains.Annotations;
 using UnityEngine;
+using VaM_PerformancePlugin.extra;
 
 namespace VaM_PerformancePlugin.VaM;
 
@@ -69,5 +71,12 @@ public class UnityThreadHelperPatch
         }
 
         return false;
+    }
+    
+    [HarmonyPatch]
+    [HarmonyFinalizer]
+    public static Exception Finalizer(Exception __exception)
+    {
+        return new PluginException("UnityThreadHelper had an exception", __exception);
     }
 }
