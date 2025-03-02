@@ -1,11 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using HarmonyLib;
 using MVR.FileManagement;
 using UnityEngine;
 using UnityEngine.Networking;
+using VaM_PerformancePlugin.extra;
+using Object = UnityEngine.Object;
+using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace VaM_PerformancePlugin.VaM;
 
@@ -13,12 +18,161 @@ namespace VaM_PerformancePlugin.VaM;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class ImageLoaderThreadedPatch
 {
+    // all shared state the helper thread can read from
+    private static readonly ImageLoaderThreadContext _threadContext = new();
+    
+    // TODO do we care if the thread is running? is there a scenario where we destroy/stop the thread?
+    // we only set this to "true" on the main thread
+    // we only set this to "false" in the helper thread
+    private static volatile bool _running = false;
+    private static Thread _thread;
+    
+    // private static final
+    
     private static readonly MethodInfo RemoveCanceledImagesMethodInfo =
         typeof(ImageLoaderThreaded).GetMethod("RemoveCanceledImages", BindingFlags.NonPublic)!;
 
     private static readonly MethodInfo useCachedTexMethodInfo =
         typeof(ImageLoaderThreaded).GetMethod("UseCachedTex", BindingFlags.NonPublic)!;
 
+    [HarmonyPatch(typeof(ImageLoaderThreaded), "StartThreads")]
+    [HarmonyPrefix]
+    public static bool StartThreads()
+    {
+        if (_running || _thread != null)
+        {
+            return false;
+        }
+        
+        // reset ctx to defaults
+        _threadContext.InterruptThread = false;
+        
+        _running = true;
+        _thread = new Thread(ImageLoaderHelperThread.DoWork)
+        {
+            // TODO make this configurable?
+            Priority = ThreadPriority.Normal,
+            // IsBackground = false,
+            // CurrentUICulture = null,
+            // CurrentCulture = null,
+            Name = "ImageLoaderTask"
+        };
+
+        return false;
+    }
+    
+    [HarmonyPatch(typeof(ImageLoaderThreaded), "StopThreads")]
+    [HarmonyPrefix]
+    public static bool StopThreads(ref ImageLoaderThreaded __instance)
+    {
+        if (!_running || _thread == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            // to try to gracefully shutdown the thread
+            _threadContext.InterruptThread = true;
+            _thread.Join(TimeSpan.FromSeconds(10));
+        }
+        catch (Exception e)
+        {
+            // TODO we should log this and fix edge cases when this happens...
+            _thread.Abort();
+        }
+        finally
+        {
+            _thread = null;
+            _running = false;
+        }
+        
+        return false;
+    }
+    
+    // Start patches to add to queue
+
+    [HarmonyPatch(typeof(ImageLoaderThreaded), nameof(ImageLoaderThreaded.QueueImage))]
+    [HarmonyPrefix]
+    public static bool QueueImage(ref ImageLoaderThreaded __instance, ImageLoaderThreaded.QueuedImage queuedImage)
+    {
+        // avoid locking if we're going to do nothing at all
+        if (queuedImage is null || _threadContext.WorkQueue is null)
+        {
+            return false;
+        }
+        
+        // lock and add the image
+        _threadContext.Lock.EnterWriteLock();
+        try
+        {
+            _threadContext.WorkQueue.Enqueue(queuedImage);
+        }
+        finally
+        {
+            // make sure we exit regardless of errors
+            _threadContext.Lock.EnterWriteLock();
+        }
+        
+        return false;
+    }
+    
+    [HarmonyPatch(typeof(ImageLoaderThreaded), nameof(ImageLoaderThreaded.QueueThumbnail))]
+    [HarmonyPrefix]
+    public static bool QueueThumbnail(ref ImageLoaderThreaded __instance, ImageLoaderThreaded.QueuedImage queuedImage)
+    {
+        // avoid locking if we're going to do nothing at all
+        if (queuedImage is null || _threadContext.WorkQueue is null)
+        {
+            return false;
+        }
+
+        queuedImage.isThumbnail = true;
+        
+        // lock and add the image
+        _threadContext.Lock.EnterWriteLock();
+        try
+        {
+            _threadContext.WorkQueue.Enqueue(queuedImage);
+        }
+        finally
+        {
+            // make sure we exit regardless of errors
+            _threadContext.Lock.EnterWriteLock();
+        }
+        
+        return false;
+    }
+    
+    [HarmonyPatch(typeof(ImageLoaderThreaded), nameof(ImageLoaderThreaded.QueueThumbnailImmediate))]
+    [HarmonyPrefix]
+    public static bool QueueThumbnailImmediate(ref ImageLoaderThreaded __instance, ImageLoaderThreaded.QueuedImage queuedImage)
+    {
+        // avoid locking if we're going to do nothing at all
+        if (queuedImage is null || _threadContext.PriorityWorkQueue is null)
+        {
+            return false;
+        }
+
+        queuedImage.isThumbnail = true;
+        
+        // lock and add the image
+        _threadContext.PriorityLock.EnterWriteLock();
+        try
+        {
+            _threadContext.PriorityWorkQueue.Enqueue(queuedImage);
+        }
+        finally
+        {
+            // make sure we exit regardless of errors
+            _threadContext.PriorityLock.EnterWriteLock();
+        }
+        
+        return false;
+    }
+    
+    // End patches to add to queue
+    
     // TODO future improvements, make this multi-threaded? it's not i/o bound currently, and should be...
     // TODO review conditionals and see if there's perf gains to be had via re-ordering logic
     [HarmonyPatch(typeof(ImageLoaderThreaded), "PreprocessImageQueue")]
@@ -144,5 +298,90 @@ public class ImageLoaderThreadedPatch
             .Append(queuedImage.imgPath)
             .ToString();
         return false;
+    }
+    
+    [HarmonyPatch]
+    [HarmonyFinalizer]
+    public static Exception Finalizer(Exception __exception)
+    {
+        return new PluginException("ImageLoaderThreaded had an exception", __exception);
+    }
+}
+
+// all data here needs to be readonly, aka immutable
+public class ImageLoaderThreadContext
+{
+    public Queue<ImageLoaderThreaded.QueuedImage> WorkQueue { get; } = new();
+    public ReaderWriterLockSlim Lock { get; } = new(LockRecursionPolicy.SupportsRecursion);
+
+    // for images that need to be loaded "immediately". we achieve this by clearing this queue first
+    public Queue<ImageLoaderThreaded.QueuedImage> PriorityWorkQueue { get; } = new();
+    public ReaderWriterLockSlim PriorityLock { get; } = new(LockRecursionPolicy.SupportsRecursion);
+    
+    // set when an item is added to the queue, to improve efficiency over having the background thread just poll the queue
+    public AutoResetEvent AddedItemSignal { get; } = new(false);
+
+    // AutoResetEvent
+    // "interrupt" signal
+    public volatile bool InterruptThread = false;
+}
+
+public class ImageLoaderHelperThread 
+{
+    private ImageLoaderHelperThread()
+    {
+    }
+
+    public static void DoWork(object data)
+    {
+        DoWork((ImageLoaderThreadContext) data);    
+    }
+    
+    public static void DoWork(ImageLoaderThreadContext ctx)
+    {
+        while (true)
+        {
+            // if asked to stop, exit gracefully
+            if (ctx.InterruptThread)
+            {
+                return;
+            }
+
+            // check priority queue first
+            // will finish the queue before moving on
+            ProcessQueues(ctx);
+            
+            // wait for more images to be added to avoid spinning
+            // will wait for 100 ms or until an image is added
+            // TODO have this be a while loop that listens for "true"?
+            // TODO when will this be cleared?
+            ctx.AddedItemSignal.WaitOne(TimeSpan.FromMilliseconds(100));
+            
+        }
+    }
+
+    public static void ProcessQueues(ImageLoaderThreadContext ctx)
+    {
+        while (ctx.PriorityWorkQueue.Count > 0 || ctx.WorkQueue.Count > 0)
+        {
+            // if asked to stop, exit gracefully
+            if (ctx.InterruptThread)
+            {
+                return;
+            }
+
+            ImageLoaderThreaded.QueuedImage qi;
+            // check PriorityQueue first
+            if (ctx.PriorityWorkQueue.Count > 0)
+            {
+                qi = ctx.PriorityWorkQueue.Dequeue();
+            }
+            else // load the normal Queue item
+            {
+                qi = ctx.WorkQueue.Dequeue();
+            }
+            
+            // TODO IMPL
+        }
     }
 }
